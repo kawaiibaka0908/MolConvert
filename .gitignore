@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Build / install artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Test / CI caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated output files
+output.*
+rebuilt.pdb
+test_*.pdb
+test_*.sdf
+test_*.zmat
+test_*.json
+
+# OS
+.DS_Store
+Thumbs.db
