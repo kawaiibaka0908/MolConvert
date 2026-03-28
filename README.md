@@ -37,3 +37,70 @@ Use cases:
 
 ---
 
+## How It Works
+
+Every conversion goes through a single internal representation — **MoleculeIC** — stored in memory and serialisable as JSON.
+
+```
+Input formats               Core IR (JSON/MoleculeIC)          Output formats
+─────────────               ─────────────────────────          ──────────────
+PDB  ── pdb_parser  ──►     ┌─────────────────────┐  ──►      PDB
+SDF  ── sdf_parser  ──►     │    MoleculeIC        │  ──►      SDF
+ZMAT ── zmat_to_json ──►    │  (bond_length,       │  ──►      ZMAT
+                            │   bond_angle,        │  ──►      JSON
+                            │   dihedral + XYZ)    │
+                            └─────────────────────┘
+```
+
+**Internal coordinate scheme:**
+
+| Atom index | bond_length | bond_angle | dihedral | Cartesian (XYZ) |
+|---|---|---|---|---|
+| 1 (anchor) | — | — | — | stored |
+| 2 (anchor) | yes | — | — | stored |
+| 3 (anchor) | yes | yes | — | stored |
+| 4+ | yes | yes | yes | reconstructed via NeRF |
+
+Reconstruction from IC back to Cartesian coordinates uses the **NeRF algorithm** (Natural Extension Reference Frame), which gives a round-trip RMSD of < 0.0001 Å.
+
+**Z-matrix (ZMAT)** is the *external* representation of internal coordinates — it is not used internally. JSON remains the core IR at all times.
+
+---
+
+## Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | 3.9 or newer | Check with `python --version` |
+| pip | any recent | Comes with Python |
+| numpy | auto-installed | Array math |
+| biopython | auto-installed | PDB parsing |
+| rdkit | auto-installed | SDF parsing |
+
+No manual installation of numpy, biopython, or rdkit is needed — `pip install -e .` handles all of them.
+
+---
+
+## Installation
+
+**Step 1** — Copy the `molconvert/` folder to the target machine. 
+
+**Step 2** — Open a terminal, navigate into the folder, and install:
+
+
+```bash
+cd molconvert
+pip install -e .
+```
+
+**Step 3** — Verify the install:
+
+```bash
+convert --help
+rmsd --help
+```
+
+After installation, two commands are available anywhere in the terminal: `convert` and `rmsd`.
+
+---
+
