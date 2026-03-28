@@ -104,3 +104,64 @@ After installation, two commands are available anywhere in the terminal: `conver
 
 ---
 
+## CLI Usage
+
+### convert
+
+Converts a molecular structure file between formats.
+
+```
+convert INPUT [--to FORMAT] [-o OUTPUT] [options]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `INPUT` | Input file — auto-detected by extension (`.pdb`, `.sdf`, `.zmat`) |
+| `--to FORMAT` | Output format: `json`, `pdb`, `sdf`, `zmat`, `internal` (= `json`) |
+| `-o PATH` | Write output to a file instead of printing to screen |
+| `--chain ID` | Process one chain only, e.g. `--chain A` (PDB input only) |
+| `--include-hetatm` | Also process ligand/HETATM records (PDB input only) |
+| `--remove-hydrogens` | Strip hydrogen atoms (SDF input only) |
+| `--summary` | Print bond-length / angle / dihedral statistics to stderr |
+| `--model N` | Choose MODEL record index (PDB input only, default: 0) |
+
+---
+
+**PDB → JSON (default)**
+
+```bash
+convert input.pdb
+convert input.pdb --to json
+convert input.pdb --to json -o output.json
+```
+
+Example JSON output (first 4 atoms):
+
+```json
+{
+  "name": "input_A",
+  "atoms": [
+    { "atom_name": "N",  "bond_length": null,  "bond_angle": null,  "dihedral": null,  "bond_to": null, "angle_to": null, "dihedral_to": null },
+    { "atom_name": "CA", "bond_length": 1.483, "bond_angle": null,  "dihedral": null,  "bond_to": 1,    "angle_to": null, "dihedral_to": null },
+    { "atom_name": "C",  "bond_length": 1.526, "bond_angle": 113.5, "dihedral": null,  "bond_to": 2,    "angle_to": 1,    "dihedral_to": null },
+    { "atom_name": "O",  "bond_length": 1.223, "bond_angle": 117.8, "dihedral": -121.2,"bond_to": 3,    "angle_to": 2,    "dihedral_to": 1    }
+  ]
+}
+```
+
+---
+
+**PDB → ZMAT**
+
+```bash
+convert input.pdb --to zmat
+convert input.pdb --to zmat -o output.zmat
+```
+
+Example ZMAT output:
+
+```
+ZMAT input_A
+# source_fmt pdb
