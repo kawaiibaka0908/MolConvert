@@ -168,3 +168,191 @@ ZMAT input_A
 # n_atoms 304
 # anchor 1    -8.901000     4.127000    -0.555000
 # anchor 2    -8.608000     3.135000    -1.618000
+# anchor 3    -7.117000     2.964000    -1.897000
+   1  N     ASN  A     1
+   2  CA    ASN  A     1     1    1.483200
+   3  C     ASN  A     1     2    1.526487     1   113.507460
+   4  O     ASN  A     1     3    1.223043     2   117.845536     1  -121.197001
+   ...
+END
+```
+
+---
+
+**PDB → SDF**
+
+```bash
+convert input.pdb --to sdf
+convert input.pdb --to sdf -o output.sdf
+```
+
+Bond connectivity is inferred automatically from interatomic distances using standard covalent radii.
+
+---
+
+**PDB → reconstructed PDB**
+
+```bash
+convert input.pdb --to pdb
+convert input.pdb --to pdb -o rebuilt.pdb
+```
+
+Converts to IC then reconstructs Cartesian positions via NeRF. Round-trip RMSD < 0.0001 Å.
+
+---
+
+**ZMAT → PDB**
+
+```bash
+convert molecule.zmat --to pdb
+convert molecule.zmat --to pdb -o rebuilt.pdb
+```
+
+---
+
+**ZMAT → JSON (internal)**
+
+```bash
+convert molecule.zmat --to internal
+convert molecule.zmat --to json
+```
+
+---
+
+**ZMAT → SDF**
+
+```bash
+convert molecule.zmat --to sdf -o output.sdf
+```
+
+---
+
+**SDF → PDB**
+
+```bash
+convert molecule.sdf --to pdb
+convert molecule.sdf --to pdb -o output.pdb
+```
+
+Multiple molecule records are written as MODEL / ENDMDL blocks.
+
+---
+
+**SDF → SDF (re-export / normalise)**
+
+```bash
+convert molecule.sdf --to sdf
+convert molecule.sdf --to sdf --remove-hydrogens -o heavy_atoms.sdf
+```
+
+---
+
+**SDF → ZMAT**
+
+```bash
+convert molecule.sdf --to zmat -o output.zmat
+```
+
+---
+
+**Single chain, with IC statistics:**
+
+```bash
+convert input.pdb --chain A --summary
+```
+
+```
+[input_A]
+IC Summary — 304 atoms (1 anchors)
+  Bond lengths (Å) : mean=2.493  std=1.361  [1.221, 8.887]
+  Bond angles  (°) : mean=79.01  std=35.28  [9.82, 176.98]
+  Dihedrals    (°) : mean=0.61   std=103.48 [-179.63, 179.94]
+```
+
+---
+
+### rmsd
+
+Computes the Root Mean Square Deviation (RMSD) between two structures, or tests round-trip reconstruction accuracy.
+
+```
+rmsd FILE1 [FILE2] [--self] [--filter ATOMS] [--per-atom] [options]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `FILE1` | First PDB file |
+| `FILE2` | Second PDB file (omit when using `--self`) |
+| `--self` | Round-trip test: reconstruct FILE1 from IC, compare to original |
+| `--filter NAMES` | Comma-separated atom names to compare, e.g. `CA` or `N,CA,C` |
+| `--per-atom` | Print a per-atom deviation table |
+| `--chain ID` | Restrict to one chain |
+| `--model N` | Choose MODEL record index (default: 0) |
+
+---
+
+**Round-trip accuracy test:**
+
+```bash
+rmsd input.pdb --self
+```
+
+```
+RMSD: 0.0000 Å
+  input.pdb (original)
+  input.pdb (reconstructed)
+```
+
+**Compare two structures:**
+
+```bash
+rmsd structure1.pdb structure2.pdb
+```
+
+**Alpha-carbon only (backbone trace):**
+
+```bash
+rmsd structure1.pdb structure2.pdb --filter CA
+```
+
+**Backbone heavy atoms with per-atom table:**
+
+```bash
+rmsd input.pdb --self --filter N,CA,C --per-atom
+```
+
+```
+Chain   Res  ResSeq  Atom   Dev (Å)
+------------------------------------
+    A   ALA       1     N    0.0000
+    A   ALA       1    CA    0.0000
+    A   ALA       1     C    0.0000
+------------------------------------
+Max deviation: 0.0000 Å
+```
+
+---
+
+## Quick Reference Table
+
+| Input | `--to` | What happens |
+|---|---|---|
+| `.pdb` | `json` | PDB → internal coordinates JSON *(default)* |
+| `.pdb` | `pdb` | PDB → reconstructed PDB via NeRF |
+| `.pdb` | `sdf` | PDB → SDF (bonds inferred) |
+| `.pdb` | `zmat` | PDB → Z-matrix |
+| `.pdb` | `internal` | alias for `json` |
+| `.sdf` | `pdb` | SDF → PDB |
+| `.sdf` | `sdf` | SDF → SDF (round-trip / re-export) |
+| `.sdf` | `json` | SDF → internal coordinates JSON |
+| `.sdf` | `zmat` | SDF → Z-matrix |
+| `.sdf` | `internal` | alias for `json` |
+| `.zmat` | `pdb` | ZMAT → reconstructed PDB |
+| `.zmat` | `sdf` | ZMAT → SDF (bonds inferred) |
+| `.zmat` | `json` | ZMAT → internal coordinates JSON |
+| `.zmat` | `internal` | alias for `json` |
+
+---
+
