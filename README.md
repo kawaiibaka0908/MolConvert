@@ -165,3 +165,6 @@ Example ZMAT output:
 ```
 ZMAT input_A
 # source_fmt pdb
+# n_atoms 304
+# anchor 1    -8.901000     4.127000    -0.555000
+# anchor 2    -8.608000     3.135000    -1.618000
