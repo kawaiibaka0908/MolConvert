@@ -378,3 +378,17 @@ mol       = load_zmat("input.zmat")                         # from ZMAT file
 # --- Reconstruct Cartesian coordinates from IC ---
 mol_rebuilt = reconstruct(mol)
 
+# --- Export as PDB ---
+pdb_text = to_pdb(mol_rebuilt)
+save_pdb(mol_rebuilt, "output.pdb")
+
+# --- Export as SDF ---
+sdf_text = molecule_to_sdf(mol)                             # single molecule
+save_sdf(mol, "output.sdf")
+multi_sdf = molecules_to_sdf(mols)                          # multiple molecules
+save_sdf_multi(mols, "output_multi.sdf")
+
+# --- Export as ZMAT ---
+zmat_text = molecule_to_zmat(mol)
+save_zmat(mol, "output.zmat")
+
