@@ -392,3 +392,16 @@ save_sdf_multi(mols, "output_multi.sdf")
 zmat_text = molecule_to_zmat(mol)
 save_zmat(mol, "output.zmat")
 
+# --- Export as JSON ---
+json_text = mol.to_json()
+mol.save_json("output.json")
+
+# --- Load from JSON ---
+from molconvert.core.internal_coords import MoleculeIC
+import json
+mol = MoleculeIC.from_dict(json.load(open("output.json")))
+
+# --- RMSD comparison ---
+r = rmsd_molecules(mol, mol_rebuilt)                        # all atoms
+r = rmsd_molecules(mol, mol_rebuilt, atom_filter=["CA"])   # CA only
+
