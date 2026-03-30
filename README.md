@@ -405,3 +405,64 @@ mol = MoleculeIC.from_dict(json.load(open("output.json")))
 r = rmsd_molecules(mol, mol_rebuilt)                        # all atoms
 r = rmsd_molecules(mol, mol_rebuilt, atom_filter=["CA"])   # CA only
 
+# --- Per-atom deviation ---
+deviations = per_atom_deviation(mol, mol_rebuilt)
+for d in deviations:
+    print(d["atom_name"], d["deviation"])
+
+# --- IC statistics ---
+summary = ic_summary(mol)
+print(summary)
+```
+
+---
+
+## Project Structure
+
+```
+molconvert/
+├── setup.py                        # package config and entry points
+├── COMMANDS.txt                    # full CLI reference
+├── README.md   
+├── report.pdf                      # About the project
+├── input.pdb                       # example PDB file
+│
+├── molconvert/                     # main package
+│   ├── core/
+│   │   ├── internal_coords.py      # AtomIC + MoleculeIC dataclasses (the IR)
+│   │   └── geometry.py             # bond length, angle, dihedral, NeRF math
+│   │
+│   ├── parsers/
+│   │   ├── pdb_parser.py           # PDB  → MoleculeIC
+│   │   └── sdf_parser.py           # SDF  → MoleculeIC  (uses RDKit)
+│   │
+│   ├── builders/
+│   │   ├── reconstruct.py          # MoleculeIC → Cartesian → PDB string
+│   │   └── to_sdf.py               # MoleculeIC → SDF V2000 string
+│   │
+│   ├── converters/
+│   │   ├── json_to_zmat.py         # MoleculeIC → ZMAT external format
+│   │   └── zmat_to_json.py         # ZMAT → MoleculeIC
+│   │
+│   ├── analysis/
+│   │   └── rmsd.py                 # RMSD, per-atom deviation, IC statistics
+│   │
+│   └── cli/
+│       └── main.py                 # run_convert + run_rmsd entry points
+│
+└── tests/
+    ├── data/
+    │   ├── mini.pdb                # 5-atom test structure
+    │   └── mini.sdf                # ethanol + acetone test molecules
+    ├── test_geometry.py            # geometry math tests
+    ├── test_parser.py              # PDB parser tests
+    ├── test_sdf_parser.py          # SDF parser tests
+    ├── test_reconstruct.py         # NeRF reconstruction tests
+    ├── test_analysis.py            # RMSD and IC summary tests
+    ├── test_cli.py                 # CLI command tests
+    ├── test_zmat.py                # ZMAT converter tests
+    └── test_sdf_convert.py         # SDF builder and SDF CLI tests
+```
+
+---
+
