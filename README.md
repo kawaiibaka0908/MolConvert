@@ -466,3 +466,51 @@ molconvert/
 
 ---
 
+## Running the Tests
+
+```bash
+cd molconvert
+pytest tests/ -v
+```
+
+214 tests covering:
+
+- Geometry math (bond length, angle, dihedral, NeRF)
+- PDB parser
+- SDF parser
+- Reconstruction builder (NeRF)
+- RMSD analysis and IC statistics
+- CLI commands (all input/output combinations)
+- ZMAT converter (JSON ↔ ZMAT, round-trip accuracy)
+- SDF builder (bond inference, multi-record output)
+
+---
+
+## Design Principles
+
+**1. JSON is always the internal IR.**  
+Every parser produces a `MoleculeIC` object. Every builder consumes one. No format talks directly to another format.
+
+**2. ZMAT is an external view of IC, not a replacement.**  
+The Z-matrix format is used for import/export only. Internally, IC values are always stored as JSON-serialisable Python dataclasses.
+
+**3. Atom ordering is explicit.**  
+Each atom carries `bond_to`, `angle_to`, and `dihedral_to` fields — 1-based indices into the molecule's atom list. This makes the ZMAT representation unambiguous and supports non-sequential reference atoms in future extensions.
+
+**4. Round-trip fidelity.**  
+Reconstruction from IC back to Cartesian coordinates uses the NeRF algorithm. Round-trip RMSD (PDB → IC → PDB) is < 0.0001 Å, limited only by floating-point arithmetic.
+
+**5. No format lock-in.**  
+Adding a new input or output format means writing one parser or builder module. The core IR and CLI wiring are unchanged.
+
+---
+
+## Known Limitations
+
+| Limitation | Detail |
+|---|---|
+| **SDF bond orders** | SDF output always writes bond type 1 (single). Double/triple bond orders are not preserved through the IC pipeline — the IC representation encodes geometry, not chemistry. |
+| **ZMAT non-sequential bonds** | The ZMAT parser reads arbitrary reference indices, but the NeRF reconstructor currently uses sequential atom ordering. Non-sequential ZMAT files (e.g. from Gaussian) will parse but reconstruct incorrectly. |
+| **No PDB CONECT records** | PDB output does not write CONECT (bond) records. Bond connectivity is only preserved in SDF output (via distance inference). |
+| **Single conformer** | Each `MoleculeIC` stores one conformer. Multi-conformer SDF files are parsed as separate molecules; PDB MODEL records are handled per-model. |
+| **Python 3.9+ required** | The codebase uses modern Python type hints. Python 3.8 and earlier are not supported. |
