@@ -356,3 +356,25 @@ Max deviation: 0.0000 Å
 
 ---
 
+## Python API
+
+All functionality is accessible programmatically:
+
+```python
+from molconvert.parsers.pdb_parser import parse_pdb
+from molconvert.parsers.sdf_parser import parse_sdf
+from molconvert.builders.reconstruct import reconstruct, to_pdb, save_pdb
+from molconvert.builders.to_sdf import molecule_to_sdf, save_sdf, molecules_to_sdf
+from molconvert.converters.json_to_zmat import molecule_to_zmat, save_zmat
+from molconvert.converters.zmat_to_json import zmat_to_molecule, load_zmat
+from molconvert.analysis import rmsd_molecules, per_atom_deviation, ic_summary
+
+# --- Parse ---
+molecules = parse_pdb("input.pdb")                          # list of MoleculeIC
+mols      = parse_sdf("compounds.sdf")                      # one per record
+mols      = parse_sdf("compounds.sdf", remove_hydrogens=True)
+mol       = load_zmat("input.zmat")                         # from ZMAT file
+
+# --- Reconstruct Cartesian coordinates from IC ---
+mol_rebuilt = reconstruct(mol)
+
