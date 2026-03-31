@@ -27,3 +27,8 @@ def unit(v: np.ndarray) -> np.ndarray:
     return v / norm
 
 
+def bond_length(a: np.ndarray, b: np.ndarray) -> float:
+    """Distance between points a and b (Angstroms)."""
+    return float(np.linalg.norm(b - a))
+
+
