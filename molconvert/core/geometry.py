@@ -19,3 +19,11 @@ import numpy as np
 #  Basic vector math                                                   #
 # ------------------------------------------------------------------ #
 
+def unit(v: np.ndarray) -> np.ndarray:
+    """Return the unit vector of v. Raises ValueError if v is zero-length."""
+    norm = np.linalg.norm(v)
+    if norm < 1e-10:
+        raise ValueError(f"Cannot normalise a near-zero vector: {v}")
+    return v / norm
+
+
