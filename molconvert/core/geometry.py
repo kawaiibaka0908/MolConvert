@@ -87,3 +87,75 @@ def dihedral_deg(a: np.ndarray, b: np.ndarray,
 #  Coordinate reconstruction (NeRF — Natural Extension Reference Frame)
 # ------------------------------------------------------------------ #
 
+def place_atom(
+    a: np.ndarray,
+    b: np.ndarray,
+    c: np.ndarray,
+    bond_length: float,
+    bond_angle_deg: float,
+    dihedral_deg: float,
+) -> np.ndarray:
+    """
+    Place a new atom D given three preceding atoms A, B, C and the IC values
+    (bond_length C–D, bond_angle B–C–D, dihedral A–B–C–D).
+
+    This is the NeRF (Natural Extension Reference Frame) algorithm. It builds
+    a local coordinate frame from A, B, C and then rotates/translates into
+    the global frame.
+
+    Parameters
+    ----------
+    a, b, c      : Cartesian positions of the three anchor atoms.
+    bond_length  : Distance C–D in Angstroms.
+    bond_angle_deg : Angle B–C–D in degrees.
+    dihedral_deg : Torsion A–B–C–D in degrees.
+
+    Returns
+    -------
+    d : (3,) array — Cartesian position of the new atom D.
+    """
+    # Convert angles to radians for numpy trig
+    theta = np.radians(bond_angle_deg)   # bond angle
+    phi   = np.radians(dihedral_deg)     # dihedral
+
+    # D in the local reference frame (before rotation into global frame).
+    #
+    # Our rotation matrix M has columns [-bc, nbc, n], so the local x-axis
+    # points from C *toward* B (backward direction).  This changes both signs
+    # relative to the "forward-x" NeRF convention found in most papers:
+    #
+    #   x-component: cos(B-C-D) = dot(unit(b-c), unit(d-c)) = d_local[0]/r
+    #                → d_local[0] = +r * cos(theta)   [NOT -cos]
+    #
+    #   z-component: the backward x-axis flips the handedness of the frame,
+    #                so phi must be negated to match our dihedral_deg convention.
+    #                → d_local[2] = -r * sin(theta) * sin(phi)
+    d_local = np.array([
+         bond_length * np.cos(theta),
+         bond_length * np.sin(theta) * np.cos(phi),
+        -bond_length * np.sin(theta) * np.sin(phi),
+    ])
+
+    # Build the rotation matrix M that maps local → global frame
+    bc = unit(c - b)
+
+    # Normal to the a-b-c plane.
+    # If a, b, c are collinear the cross product is zero — fall back to an
+    # arbitrary vector perpendicular to bc so reconstruction can still proceed.
+    n_raw = np.cross(b - a, bc)
+    if np.linalg.norm(n_raw) < 1e-10:
+        # Pick a reference vector that is not parallel to bc
+        ref = np.array([1.0, 0.0, 0.0])
+        if abs(np.dot(bc, ref)) > 0.9:   # bc ≈ x-axis → use y-axis instead
+            ref = np.array([0.0, 1.0, 0.0])
+        n_raw = np.cross(bc, ref)
+    n = unit(n_raw)
+
+    nbc = np.cross(n, bc)               # completes right-hand frame
+
+    # Columns of M: [-bc | nbc | n]  (matches the local frame axes above)
+    M = np.column_stack([-bc, nbc, n])
+
+    # Rotate and translate
+    d = M @ d_local + c
+    return d
