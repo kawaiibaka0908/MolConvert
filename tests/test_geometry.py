@@ -36,3 +36,33 @@ def test_unit_zero_raises():
 #  bond_length                                                         #
 # ------------------------------------------------------------------ #
 
+def test_bond_length_along_x():
+    a = np.array([0.0, 0.0, 0.0])
+    b = np.array([1.5, 0.0, 0.0])
+    assert abs(bond_length(a, b) - 1.5) < 1e-10
+
+
+def test_bond_length_3d():
+    a = np.array([1.0, 2.0, 3.0])
+    b = np.array([4.0, 6.0, 3.0])
+    # distance = sqrt(9 + 16 + 0) = 5
+    assert abs(bond_length(a, b) - 5.0) < 1e-10
+
+
+def test_bond_length_symmetric():
+    a = np.array([1.0, 0.0, 0.0])
+    b = np.array([0.0, 1.0, 0.0])
+    assert abs(bond_length(a, b) - bond_length(b, a)) < 1e-12
+
+
+# ------------------------------------------------------------------ #
+#  bond_angle_deg                                                      #
+# ------------------------------------------------------------------ #
+
+def test_bond_angle_90():
+    a = np.array([1.0, 0.0, 0.0])
+    b = np.array([0.0, 0.0, 0.0])
+    c = np.array([0.0, 1.0, 0.0])
+    assert abs(bond_angle_deg(a, b, c) - 90.0) < 1e-10
+
+
