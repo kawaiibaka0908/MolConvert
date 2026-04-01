@@ -32,3 +32,17 @@ def bond_length(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.linalg.norm(b - a))
 
 
+def bond_angle_deg(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
+    """
+    Angle a–b–c in degrees.
+
+    b is the vertex (the middle atom).
+    Returns a value in [0, 180].
+    """
+    ba = unit(a - b)
+    bc = unit(c - b)
+    # Clamp dot product to [-1, 1] to guard against floating-point overshoot.
+    cos_theta = np.clip(np.dot(ba, bc), -1.0, 1.0)
+    return float(np.degrees(np.arccos(cos_theta)))
+
+
