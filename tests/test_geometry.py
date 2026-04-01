@@ -66,3 +66,39 @@ def test_bond_angle_90():
     assert abs(bond_angle_deg(a, b, c) - 90.0) < 1e-10
 
 
+def test_bond_angle_180():
+    a = np.array([-1.0, 0.0, 0.0])
+    b = np.array([ 0.0, 0.0, 0.0])
+    c = np.array([ 1.0, 0.0, 0.0])
+    assert abs(bond_angle_deg(a, b, c) - 180.0) < 1e-10
+
+
+def test_bond_angle_60():
+    # Equilateral triangle — angle at origin = 60°
+    a = np.array([1.0, 0.0, 0.0])
+    b = np.array([0.0, 0.0, 0.0])
+    c = np.array([0.5, np.sqrt(3) / 2, 0.0])
+    assert abs(bond_angle_deg(a, b, c) - 60.0) < 1e-8
+
+
+def test_bond_angle_in_range():
+    rng = np.random.default_rng(42)
+    for _ in range(50):
+        a, b, c = rng.standard_normal((3, 3))
+        angle = bond_angle_deg(a, b, c)
+        assert 0.0 <= angle <= 180.0
+
+
+# ------------------------------------------------------------------ #
+#  dihedral_deg                                                        #
+# ------------------------------------------------------------------ #
+
+def test_dihedral_zero():
+    # All atoms in the x-y plane, cis configuration → 0°
+    a = np.array([0.0, 1.0, 0.0])
+    b = np.array([0.0, 0.0, 0.0])
+    c = np.array([1.0, 0.0, 0.0])
+    d = np.array([1.0, 1.0, 0.0])
+    assert abs(dihedral_deg(a, b, c, d)) < 1e-8
+
+
