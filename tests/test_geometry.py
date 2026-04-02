@@ -141,3 +141,48 @@ def test_dihedral_collinear_returns_zero():
 #  place_atom (NeRF round-trip)                                        #
 # ------------------------------------------------------------------ #
 
+def test_place_atom_recovers_position():
+    """
+    Given three anchor atoms and a known fourth, compute its IC from the
+    geometry functions, then reconstruct with place_atom — must match.
+    """
+    a = np.array([0.0, 0.0, 0.0])
+    b = np.array([1.5, 0.0, 0.0])
+    c = np.array([2.0, 1.2, 0.0])
+    d_true = np.array([3.0, 1.5, 0.8])
+
+    bl = bond_length(c, d_true)
+    ba = bond_angle_deg(b, c, d_true)
+    di = dihedral_deg(a, b, c, d_true)
+
+    d_recon = place_atom(a, b, c, bl, ba, di)
+    np.testing.assert_allclose(d_recon, d_true, atol=1e-8)
+
+
+def test_place_atom_correct_bond_length():
+    a = np.array([0.0, 0.0, 0.0])
+    b = np.array([1.5, 0.0, 0.0])
+    c = np.array([2.0, 1.2, 0.0])
+    d = place_atom(a, b, c, bond_length=1.4, bond_angle_deg=110.0, dihedral_deg=45.0)
+    assert abs(bond_length(c, d) - 1.4) < 1e-8
+
+
+def test_place_atom_correct_bond_angle():
+    a = np.array([0.0, 0.0, 0.0])
+    b = np.array([1.5, 0.0, 0.0])
+    c = np.array([2.0, 1.2, 0.0])
+    d = place_atom(a, b, c, bond_length=1.4, bond_angle_deg=109.5, dihedral_deg=60.0)
+    assert abs(bond_angle_deg(b, c, d) - 109.5) < 1e-6
+
+
+def test_place_atom_correct_dihedral():
+    a = np.array([0.0, 0.0, 0.0])
+    b = np.array([1.5, 0.0, 0.0])
+    c = np.array([2.0, 1.2, 0.0])
+    for target_di in [-120.0, -60.0, 0.0, 60.0, 120.0, 180.0]:
+        d = place_atom(a, b, c, bond_length=1.4, bond_angle_deg=109.5,
+                       dihedral_deg=target_di)
+        recovered = dihedral_deg(a, b, c, d)
+        assert abs(recovered - target_di) < 1e-6, (
+            f"dihedral {target_di}° → recovered {recovered}°"
+        )
