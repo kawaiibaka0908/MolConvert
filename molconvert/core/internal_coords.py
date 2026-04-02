@@ -51,3 +51,9 @@ class AtomIC:
     cart_y: Optional[float] = None
     cart_z: Optional[float] = None
 
+    @property
+    def is_anchor(self) -> bool:
+        """True if this atom uses absolute Cartesian coords (first 3 atoms)."""
+        return self.bond_length is None
+
+    @property
