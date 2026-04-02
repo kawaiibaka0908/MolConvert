@@ -102,3 +102,42 @@ def test_dihedral_zero():
     assert abs(dihedral_deg(a, b, c, d)) < 1e-8
 
 
+def test_dihedral_180():
+    # trans configuration
+    a = np.array([0.0,  1.0, 0.0])
+    b = np.array([0.0,  0.0, 0.0])
+    c = np.array([1.0,  0.0, 0.0])
+    d = np.array([1.0, -1.0, 0.0])
+    assert abs(abs(dihedral_deg(a, b, c, d)) - 180.0) < 1e-8
+
+
+def test_dihedral_90():
+    a = np.array([0.0, 1.0, 0.0])
+    b = np.array([0.0, 0.0, 0.0])
+    c = np.array([1.0, 0.0, 0.0])
+    d = np.array([1.0, 0.0, 1.0])   # rotated 90° out of plane
+    assert abs(abs(dihedral_deg(a, b, c, d)) - 90.0) < 1e-8
+
+
+def test_dihedral_range():
+    rng = np.random.default_rng(7)
+    for _ in range(50):
+        a, b, c, d = rng.standard_normal((4, 3))
+        di = dihedral_deg(a, b, c, d)
+        assert -180.0 <= di <= 180.0
+
+
+def test_dihedral_collinear_returns_zero():
+    # b and c collinear with a — undefined dihedral, should not raise
+    a = np.array([0.0, 0.0, 0.0])
+    b = np.array([1.0, 0.0, 0.0])
+    c = np.array([2.0, 0.0, 0.0])
+    d = np.array([3.0, 0.0, 0.0])
+    result = dihedral_deg(a, b, c, d)
+    assert result == 0.0
+
+
+# ------------------------------------------------------------------ #
+#  place_atom (NeRF round-trip)                                        #
+# ------------------------------------------------------------------ #
+
