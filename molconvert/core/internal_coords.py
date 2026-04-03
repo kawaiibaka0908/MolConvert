@@ -125,3 +125,33 @@ class MoleculeIC:
     def __len__(self) -> int:
         return len(self.atoms)
 
+    def get_positions(self) -> np.ndarray:
+        """
+        Return Cartesian coordinates as an (N, 3) array.
+        Raises ValueError if any atom has no position set.
+        """
+        positions = []
+        for atom in self.atoms:
+            if atom.position is None:
+                raise ValueError(
+                    f"Atom {atom.atom_serial} ({atom.atom_name}) has no "
+                    "Cartesian position. Run reconstruction first."
+                )
+            positions.append(atom.position)
+        return np.array(positions, dtype=float)
+
+    def get_atom_names(self) -> list[str]:
+        return [a.atom_name for a in self.atoms]
+
+    # ------------------------------------------------------------------ #
+    #  Serialisation                                                       #
+    # ------------------------------------------------------------------ #
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "source_fmt": self.source_fmt,
+            "metadata": self.metadata,
+            "atoms": [a.to_dict() for a in self.atoms],
+        }
+
