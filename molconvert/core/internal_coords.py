@@ -100,3 +100,28 @@ class AtomIC:
         return cls(**data)
 
 
+@dataclass
+class MoleculeIC:
+    """
+    Internal coordinate representation of an entire molecule or chain.
+
+    Attributes
+    ----------
+    name        : Molecule / structure identifier (e.g. PDB ID or filename stem)
+    source_fmt  : Original file format ("pdb" | "sdf")
+    atoms       : Ordered list of AtomIC records (ordering matters for reconstruction)
+    metadata    : Arbitrary key-value pairs (e.g. header info from PDB)
+    """
+
+    name: str
+    source_fmt: str
+    atoms: list[AtomIC] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
+
+    # ------------------------------------------------------------------ #
+    #  Convenience accessors                                               #
+    # ------------------------------------------------------------------ #
+
+    def __len__(self) -> int:
+        return len(self.atoms)
+
