@@ -69,3 +69,34 @@ class AtomIC:
         self.cart_y = float(coords[1])
         self.cart_z = float(coords[2])
 
+    def to_dict(self) -> dict:
+        return {
+            "atom_serial": self.atom_serial,
+            "atom_name": self.atom_name,
+            "residue_name": self.residue_name,
+            "chain_id": self.chain_id,
+            "residue_seq": self.residue_seq,
+            "element": self.element,
+            "bond_length": self.bond_length,
+            "bond_angle": self.bond_angle,
+            "dihedral": self.dihedral,
+            "bond_to": self.bond_to,
+            "angle_to": self.angle_to,
+            "dihedral_to": self.dihedral_to,
+            "cart_x": self.cart_x,
+            "cart_y": self.cart_y,
+            "cart_z": self.cart_z,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> AtomIC:
+        # Merge with defaults for fields added after the original schema.
+        data = {
+            **d,
+            "bond_to": d.get("bond_to"),
+            "angle_to": d.get("angle_to"),
+            "dihedral_to": d.get("dihedral_to"),
+        }
+        return cls(**data)
+
+
