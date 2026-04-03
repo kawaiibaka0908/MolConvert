@@ -57,3 +57,15 @@ class AtomIC:
         return self.bond_length is None
 
     @property
+    def position(self) -> Optional[np.ndarray]:
+        """Return Cartesian position as a numpy array, or None if unset."""
+        if self.cart_x is None:
+            return None
+        return np.array([self.cart_x, self.cart_y, self.cart_z], dtype=float)
+
+    @position.setter
+    def position(self, coords: np.ndarray) -> None:
+        self.cart_x = float(coords[0])
+        self.cart_y = float(coords[1])
+        self.cart_z = float(coords[2])
+
