@@ -155,3 +155,11 @@ class MoleculeIC:
             "atoms": [a.to_dict() for a in self.atoms],
         }
 
+    def to_json(self, indent: int = 2) -> str:
+        return json.dumps(self.to_dict(), indent=indent)
+
+    def save_json(self, path: str) -> None:
+        with open(path, "w") as fh:
+            fh.write(self.to_json())
+
+    @classmethod
