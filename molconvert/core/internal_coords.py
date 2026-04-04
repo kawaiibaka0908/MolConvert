@@ -163,3 +163,16 @@ class MoleculeIC:
             fh.write(self.to_json())
 
     @classmethod
+    def from_dict(cls, d: dict) -> MoleculeIC:
+        atoms = [AtomIC.from_dict(a) for a in d["atoms"]]
+        return cls(
+            name=d["name"],
+            source_fmt=d["source_fmt"],
+            atoms=atoms,
+            metadata=d.get("metadata", {}),
+        )
+
+    @classmethod
+    def load_json(cls, path: str) -> MoleculeIC:
+        with open(path) as fh:
+            return cls.from_dict(json.load(fh))
