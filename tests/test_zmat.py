@@ -145,3 +145,80 @@ def test_atom2_bond_length_matches_source(mini_mol, mini_zmat):
     assert zmat_bl == pytest.approx(mini_mol.atoms[1].bond_length, abs=1e-5)
 
 
+def test_atom3_bond_angle_present(mini_zmat):
+    angle = float(_data_lines(mini_zmat)[2][8])
+    assert 90.0 < angle < 140.0   # chemically sensible range for C-C-N
+
+
+def test_atom4_dihedral_present(mini_zmat):
+    dihedral = float(_data_lines(mini_zmat)[3][10])
+    assert -180.0 <= dihedral <= 180.0
+
+
+# ------------------------------------------------------------------ #
+#  json_to_zmat — save_zmat                                            #
+# ------------------------------------------------------------------ #
+
+def test_save_zmat_creates_file(mini_mol, tmp_path):
+    out = str(tmp_path / "mol.zmat")
+    save_zmat(mini_mol, out)
+    assert Path(out).exists()
+
+
+def test_save_zmat_content_matches_string(mini_mol, tmp_path):
+    out = str(tmp_path / "mol.zmat")
+    save_zmat(mini_mol, out)
+    content = Path(out).read_text().strip()
+    assert content == molecule_to_zmat(mini_mol).strip()
+
+
+# ------------------------------------------------------------------ #
+#  zmat_to_json — basic structure                                      #
+# ------------------------------------------------------------------ #
+
+def test_zmat_to_molecule_returns_moleculeic(mini_zmat):
+    from molconvert.core.internal_coords import MoleculeIC
+    mol = zmat_to_molecule(mini_zmat)
+    assert isinstance(mol, MoleculeIC)
+
+
+def test_zmat_to_molecule_atom_count(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert len(mol.atoms) == 5
+
+
+def test_zmat_to_molecule_name_preserved(mini_mol, mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.name == mini_mol.name
+
+
+def test_zmat_to_molecule_source_fmt(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.source_fmt == "pdb"
+
+
+def test_zmat_to_molecule_atom_names(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    names = [a.atom_name for a in mol.atoms]
+    assert names == ["N", "CA", "C", "O", "N"]
+
+
+# ------------------------------------------------------------------ #
+#  zmat_to_json — IC values preserved                                  #
+# ------------------------------------------------------------------ #
+
+def test_bond_length_preserved(mini_mol, mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.atoms[1].bond_length == pytest.approx(mini_mol.atoms[1].bond_length, abs=1e-5)
+
+
+def test_bond_angle_preserved(mini_mol, mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.atoms[2].bond_angle == pytest.approx(mini_mol.atoms[2].bond_angle, abs=1e-3)
+
+
+def test_dihedral_preserved(mini_mol, mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.atoms[3].dihedral == pytest.approx(mini_mol.atoms[3].dihedral, abs=1e-3)
+
+
