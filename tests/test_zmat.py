@@ -222,3 +222,102 @@ def test_dihedral_preserved(mini_mol, mini_zmat):
     assert mol.atoms[3].dihedral == pytest.approx(mini_mol.atoms[3].dihedral, abs=1e-3)
 
 
+def test_first_atom_ic_is_none(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.atoms[0].bond_length is None
+    assert mol.atoms[0].bond_angle  is None
+    assert mol.atoms[0].dihedral    is None
+
+
+# ------------------------------------------------------------------ #
+#  zmat_to_json — reference indices preserved                          #
+# ------------------------------------------------------------------ #
+
+def test_bond_to_preserved(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.atoms[1].bond_to    == 1
+    assert mol.atoms[2].bond_to    == 2
+    assert mol.atoms[3].bond_to    == 3
+
+
+def test_angle_to_preserved(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.atoms[2].angle_to   == 1
+    assert mol.atoms[3].angle_to   == 2
+
+
+def test_dihedral_to_preserved(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.atoms[3].dihedral_to == 1
+
+
+# ------------------------------------------------------------------ #
+#  zmat_to_json — anchor positions                                     #
+# ------------------------------------------------------------------ #
+
+def test_anchor_1_cartesian_restored(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    a = mol.atoms[0]
+    assert a.cart_x == pytest.approx(0.0, abs=1e-4)
+    assert a.cart_y == pytest.approx(0.0, abs=1e-4)
+    assert a.cart_z == pytest.approx(0.0, abs=1e-4)
+
+
+def test_anchor_2_cartesian_restored(mini_mol, mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    a = mol.atoms[1]
+    assert a.cart_x == pytest.approx(mini_mol.atoms[1].cart_x, abs=1e-4)
+
+
+def test_non_anchor_cartesian_is_none_before_reconstruct(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    assert mol.atoms[3].cart_x is None
+
+
+# ------------------------------------------------------------------ #
+#  zmat_to_json — element derivation                                   #
+# ------------------------------------------------------------------ #
+
+def test_elements_derived_correctly(mini_zmat):
+    mol = zmat_to_molecule(mini_zmat)
+    elements = [a.element for a in mol.atoms]
+    assert elements == ["N", "C", "C", "O", "N"]
+
+
+# ------------------------------------------------------------------ #
+#  zmat_to_json — load_zmat from file                                  #
+# ------------------------------------------------------------------ #
+
+def test_load_zmat_from_file(mini_mol, tmp_path):
+    zmat_path = str(tmp_path / "mol.zmat")
+    save_zmat(mini_mol, zmat_path)
+    mol = load_zmat(zmat_path)
+    assert len(mol.atoms) == 5
+    assert mol.atoms[1].bond_length == pytest.approx(mini_mol.atoms[1].bond_length, abs=1e-5)
+
+
+# ------------------------------------------------------------------ #
+#  Round-trip accuracy                                                 #
+# ------------------------------------------------------------------ #
+
+def test_roundtrip_rmsd_realistic(mini_mol):
+    zmat_text  = molecule_to_zmat(mini_mol)
+    mol_back   = zmat_to_molecule(zmat_text)
+    mol_rebuilt = reconstruct(mol_back)
+    r = rmsd_molecules(mini_mol, mol_rebuilt)
+    # ZMAT stores angles/dihedrals at 2 decimal places (0.01°), so
+    # reconstruction introduces small but non-zero error.
+    assert r < 0.5, f"Round-trip RMSD unexpectedly large: {r:.4f} Å"
+    assert r > 0.0, f"Round-trip RMSD was exactly zero — likely a copy, not a reconstruction"
+
+
+def test_roundtrip_atom_count_preserved(mini_mol):
+    zmat_text  = molecule_to_zmat(mini_mol)
+    mol_back   = zmat_to_molecule(zmat_text)
+    assert len(mol_back.atoms) == len(mini_mol.atoms)
+
+
+# ------------------------------------------------------------------ #
+#  CLI — PDB → ZMAT                                                    #
+# ------------------------------------------------------------------ #
+
