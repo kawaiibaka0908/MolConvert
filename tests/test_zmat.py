@@ -321,3 +321,113 @@ def test_roundtrip_atom_count_preserved(mini_mol):
 #  CLI — PDB → ZMAT                                                    #
 # ------------------------------------------------------------------ #
 
+def test_cli_pdb_to_zmat_stdout(capsys):
+    run_convert([MINI_PDB, "--to", "zmat"])
+    out, _ = capsys.readouterr()
+    assert out.startswith("ZMAT ")
+    assert "END" in out
+
+
+def test_cli_pdb_to_zmat_has_correct_atom_count(capsys):
+    run_convert([MINI_PDB, "--to", "zmat"])
+    out, _ = capsys.readouterr()
+    data_lines = [l for l in out.splitlines()
+                  if l.strip() and not l.startswith("#")
+                  and not l.startswith("ZMAT") and l.strip() != "END"]
+    assert len(data_lines) == 5
+
+
+def test_cli_pdb_to_zmat_to_file(tmp_path, capsys):
+    out_path = str(tmp_path / "out.zmat")
+    run_convert([MINI_PDB, "--to", "zmat", "-o", out_path])
+    assert Path(out_path).exists()
+    content = Path(out_path).read_text()
+    assert content.startswith("ZMAT ")
+
+
+# ------------------------------------------------------------------ #
+#  CLI — ZMAT → PDB                                                    #
+# ------------------------------------------------------------------ #
+
+def test_cli_zmat_to_pdb_stdout(tmp_path, capsys):
+    zmat_path = str(tmp_path / "mol.zmat")
+    mol = parse_pdb(MINI_PDB)[0]
+    save_zmat(mol, zmat_path)
+
+    run_convert([zmat_path, "--to", "pdb"])
+    out, _ = capsys.readouterr()
+    atom_lines = [l for l in out.splitlines() if l.startswith("ATOM")]
+    assert len(atom_lines) == 5
+
+
+def test_cli_zmat_to_pdb_ends_with_end(tmp_path, capsys):
+    zmat_path = str(tmp_path / "mol.zmat")
+    save_zmat(parse_pdb(MINI_PDB)[0], zmat_path)
+    run_convert([zmat_path, "--to", "pdb"])
+    out, _ = capsys.readouterr()
+    assert "END" in out
+
+
+# ------------------------------------------------------------------ #
+#  CLI — ZMAT → internal (JSON)                                        #
+# ------------------------------------------------------------------ #
+
+def test_cli_zmat_to_internal_is_valid_json(tmp_path, capsys):
+    zmat_path = str(tmp_path / "mol.zmat")
+    save_zmat(parse_pdb(MINI_PDB)[0], zmat_path)
+    run_convert([zmat_path, "--to", "internal"])
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    assert "atoms" in data
+    assert len(data["atoms"]) == 5
+
+
+def test_cli_zmat_to_json_same_as_internal(tmp_path, capsys):
+    zmat_path = str(tmp_path / "mol.zmat")
+    save_zmat(parse_pdb(MINI_PDB)[0], zmat_path)
+
+    run_convert([zmat_path, "--to", "internal"])
+    out_internal, _ = capsys.readouterr()
+
+    run_convert([zmat_path, "--to", "json"])
+    out_json, _ = capsys.readouterr()
+
+    assert json.loads(out_internal)["name"] == json.loads(out_json)["name"]
+
+
+# ------------------------------------------------------------------ #
+#  CLI — backward compatibility                                        #
+# ------------------------------------------------------------------ #
+
+def test_cli_legacy_format_flag_json(capsys):
+    run_convert([MINI_PDB, "-f", "json"])
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    assert len(data["atoms"]) == 5
+
+
+def test_cli_legacy_format_flag_pdb(capsys):
+    run_convert([MINI_PDB, "-f", "pdb"])
+    out, _ = capsys.readouterr()
+    assert "ATOM" in out
+
+
+def test_cli_default_output_is_json(capsys):
+    run_convert([MINI_PDB])
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    assert "atoms" in data
+
+
+# ------------------------------------------------------------------ #
+#  CLI — error paths                                                   #
+# ------------------------------------------------------------------ #
+
+def test_cli_unknown_extension_exits():
+    with pytest.raises(SystemExit):
+        run_convert(["molecule.xyz"])
+
+
+def test_cli_missing_zmat_file_exits():
+    with pytest.raises(SystemExit):
+        run_convert(["ghost.zmat", "--to", "pdb"])
