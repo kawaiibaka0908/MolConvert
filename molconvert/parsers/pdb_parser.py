@@ -36,3 +36,70 @@ from ..core.geometry import (
 #  Public API                                                          #
 # ------------------------------------------------------------------ #
 
+def parse_pdb(
+    path: str,
+    model_id: int = 0,
+    include_hetatm: bool = False,
+) -> list[MoleculeIC]:
+    """
+    Parse a PDB file and return a list of MoleculeIC objects.
+
+    Parameters
+    ----------
+    path           : Path to the PDB file.
+    model_id       : Which MODEL record to use (0 = first model).
+    include_hetatm : Also return one MoleculeIC per ligand residue
+                     (HETATM records, excluding water).
+
+    Returns
+    -------
+    List of MoleculeIC.  A single-chain protein returns a list of length 1.
+    """
+    biopython_parser = PDB.PDBParser(QUIET=True)
+    structure = biopython_parser.get_structure(Path(path).stem, path)
+
+    try:
+        model = structure[model_id]
+    except KeyError:
+        raise ValueError(f"Model id {model_id} not found in {path}")
+
+    molecules: list[MoleculeIC] = []
+    stem = Path(path).stem
+
+    # --- ATOM records: one MoleculeIC per chain ---
+    for chain in model:
+        atoms = _collect_atoms(chain, hetatm=False)
+        if not atoms:
+            continue
+        mol = _build_molecule_ic(
+            atoms,
+            name=f"{stem}_{chain.id}",
+            source_fmt="pdb",
+        )
+        molecules.append(mol)
+
+    # --- HETATM records: one MoleculeIC per unique ligand residue ---
+    if include_hetatm:
+        for chain in model:
+            for residue in chain:
+                hetflag = residue.id[0].strip()
+                # BioPython marks HETATM as "H_<resname>"; water as "W"
+                if not hetflag or hetflag == "W":
+                    continue
+                lig_atoms = list(residue.get_atoms())
+                if not lig_atoms:
+                    continue
+                mol = _build_molecule_ic(
+                    lig_atoms,
+                    name=f"{stem}_{residue.resname.strip()}_{residue.id[1]}",
+                    source_fmt="pdb",
+                )
+                molecules.append(mol)
+
+    return molecules
+
+
+# ------------------------------------------------------------------ #
+#  Internal helpers                                                    #
+# ------------------------------------------------------------------ #
+
