@@ -57,3 +57,41 @@ def test_atom_serials():
     assert serials == [1, 2, 3, 4, 5]
 
 
+def test_atom_residue_names():
+    mol = parse_pdb(MINI_PDB)[0]
+    res_names = [a.residue_name for a in mol.atoms]
+    assert all(r == "ALA" for r in res_names)
+
+
+def test_atom_chain_ids():
+    mol = parse_pdb(MINI_PDB)[0]
+    assert all(a.chain_id == "A" for a in mol.atoms)
+
+
+def test_atom_elements():
+    mol = parse_pdb(MINI_PDB)[0]
+    elements = [a.element for a in mol.atoms]
+    assert elements == ["N", "C", "C", "O", "N"]
+
+
+# ------------------------------------------------------------------ #
+#  Internal coordinate values                                          #
+# ------------------------------------------------------------------ #
+
+def test_first_atom_is_anchor():
+    mol = parse_pdb(MINI_PDB)[0]
+    atom0 = mol.atoms[0]
+    assert atom0.bond_length is None
+    assert atom0.bond_angle  is None
+    assert atom0.dihedral    is None
+    assert atom0.is_anchor
+
+
+def test_second_atom_has_bond_length_only():
+    mol = parse_pdb(MINI_PDB)[0]
+    atom1 = mol.atoms[1]
+    assert atom1.bond_length is not None
+    assert atom1.bond_angle  is None
+    assert atom1.dihedral    is None
+
+
