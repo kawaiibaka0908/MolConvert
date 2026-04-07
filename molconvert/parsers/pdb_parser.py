@@ -103,3 +103,14 @@ def parse_pdb(
 #  Internal helpers                                                    #
 # ------------------------------------------------------------------ #
 
+def _collect_atoms(chain, hetatm: bool = False) -> list[Atom]:
+    """Flatten a chain into an ordered list of atoms, skipping HETATM if asked."""
+    atoms: list[Atom] = []
+    for residue in chain:
+        hetflag = residue.id[0].strip()
+        if hetflag and not hetatm:
+            continue   # skip HETATM / water for ATOM-only mode
+        atoms.extend(residue.get_atoms())
+    return atoms
+
+
