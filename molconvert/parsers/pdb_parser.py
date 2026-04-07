@@ -114,3 +114,61 @@ def _collect_atoms(chain, hetatm: bool = False) -> list[Atom]:
     return atoms
 
 
+def _build_molecule_ic(
+    atoms: list[Atom],
+    name: str,
+    source_fmt: str,
+) -> MoleculeIC:
+    """
+    Convert a flat ordered list of BioPython Atoms into a MoleculeIC.
+
+    The IC for each atom is computed relative to its immediate predecessors
+    in the list.  Atoms 0–2 act as anchors: their Cartesian positions seed
+    the NeRF reconstruction chain.
+    """
+    mol = MoleculeIC(name=name, source_fmt=source_fmt)
+    positions: list[np.ndarray] = []
+
+    for i, atom in enumerate(atoms):
+        pos = np.array(atom.get_vector().get_array(), dtype=float)
+        positions.append(pos)
+
+        # Compute whichever IC values are available at this depth
+        bl: Optional[float] = None
+        ba: Optional[float] = None
+        di: Optional[float] = None
+
+        if i >= 1:
+            bl = _bl(positions[i - 1], pos)
+        if i >= 2:
+            ba = _ba(positions[i - 2], positions[i - 1], pos)
+        if i >= 3:
+            di = _di(positions[i - 3], positions[i - 2], positions[i - 1], pos)
+
+        # Resolve element symbol; fall back to first letter of atom name
+        element = (atom.element or "").strip()
+        if not element:
+            element = atom.name.strip().lstrip("0123456789")[0]
+
+        residue = atom.get_parent()
+
+        ic_atom = AtomIC(
+            atom_serial=atom.serial_number,
+            atom_name=atom.name.strip(),
+            residue_name=residue.resname.strip(),
+            chain_id=residue.get_parent().id,
+            residue_seq=residue.id[1],
+            element=element,
+            bond_length=bl,
+            bond_angle=ba,
+            dihedral=di,
+            bond_to=i if i >= 1 else None,          # 1-based index of previous atom
+            angle_to=i - 1 if i >= 2 else None,     # 1-based index two atoms back
+            dihedral_to=i - 2 if i >= 3 else None,  # 1-based index three atoms back
+            cart_x=float(pos[0]),
+            cart_y=float(pos[1]),
+            cart_z=float(pos[2]),
+        )
+        mol.atoms.append(ic_atom)
+
+    return mol
