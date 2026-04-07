@@ -95,3 +95,34 @@ def test_second_atom_has_bond_length_only():
     assert atom1.dihedral    is None
 
 
+def test_third_atom_has_bond_length_and_angle():
+    mol = parse_pdb(MINI_PDB)[0]
+    atom2 = mol.atoms[2]
+    assert atom2.bond_length is not None
+    assert atom2.bond_angle  is not None
+    assert atom2.dihedral    is None
+
+
+def test_fourth_atom_has_all_ic():
+    mol = parse_pdb(MINI_PDB)[0]
+    atom3 = mol.atoms[3]
+    assert atom3.bond_length is not None
+    assert atom3.bond_angle  is not None
+    assert atom3.dihedral    is not None
+
+
+def test_bond_length_ca_n_approx():
+    # N→CA in mini.pdb is exactly 1.458 Å
+    mol = parse_pdb(MINI_PDB)[0]
+    bl = mol.atoms[1].bond_length
+    assert abs(bl - 1.458) < 0.001
+
+
+def test_cartesian_positions_stored():
+    mol = parse_pdb(MINI_PDB)[0]
+    for atom in mol.atoms:
+        assert atom.cart_x is not None
+        assert atom.cart_y is not None
+        assert atom.cart_z is not None
+
+
