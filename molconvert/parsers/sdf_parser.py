@@ -111,3 +111,9 @@ def parse_sdf(
 #  Internal helpers                                                    #
 # ------------------------------------------------------------------ #
 
+def _mol_name(rdmol, fallback_idx: int) -> str:
+    """Return the molecule's title line, or 'mol<N>' if blank."""
+    name = rdmol.GetProp("_Name").strip() if rdmol.HasProp("_Name") else ""
+    return name if name else f"mol{fallback_idx}"
+
+
