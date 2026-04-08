@@ -126,3 +126,47 @@ def test_cartesian_positions_stored():
         assert atom.cart_z is not None
 
 
+def test_first_atom_at_origin():
+    mol = parse_pdb(MINI_PDB)[0]
+    atom = mol.atoms[0]
+    assert atom.cart_x == pytest.approx(0.0)
+    assert atom.cart_y == pytest.approx(0.0)
+    assert atom.cart_z == pytest.approx(0.0)
+
+
+# ------------------------------------------------------------------ #
+#  Error handling                                                      #
+# ------------------------------------------------------------------ #
+
+def test_invalid_path_raises():
+    with pytest.raises(Exception):
+        parse_pdb("nonexistent_file.pdb")
+
+
+def test_invalid_model_id_raises():
+    with pytest.raises(ValueError):
+        parse_pdb(MINI_PDB, model_id=99)
+
+
+# ------------------------------------------------------------------ #
+#  Serialisation round-trip                                            #
+# ------------------------------------------------------------------ #
+
+def test_to_dict_from_dict_roundtrip():
+    mol = parse_pdb(MINI_PDB)[0]
+    d = mol.to_dict()
+    mol2 = MoleculeIC.from_dict(d)
+    assert mol2.name == mol.name
+    assert len(mol2.atoms) == len(mol.atoms)
+    for a1, a2 in zip(mol.atoms, mol2.atoms):
+        assert a1.atom_name  == a2.atom_name
+        assert a1.bond_length == pytest.approx(a2.bond_length, abs=1e-10) \
+               if a1.bond_length is not None else a2.bond_length is None
+
+
+def test_to_json_from_json_roundtrip():
+    mol = parse_pdb(MINI_PDB)[0]
+    json_str = mol.to_json()
+    mol2 = MoleculeIC.from_dict(__import__("json").loads(json_str))
+    assert mol2.name == mol.name
+    assert len(mol2.atoms) == len(mol.atoms)
