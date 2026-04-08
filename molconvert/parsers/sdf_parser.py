@@ -44,3 +44,70 @@ from ..core.geometry import (
 #  Public API                                                          #
 # ------------------------------------------------------------------ #
 
+def parse_sdf(
+    path: str,
+    remove_hydrogens: bool = False,
+    skip_invalid: bool = True,
+) -> list[MoleculeIC]:
+    """
+    Parse an SDF file and return one MoleculeIC per molecule record.
+
+    Parameters
+    ----------
+    path             : Path to the SDF file.
+    remove_hydrogens : If True, hydrogen atoms are stripped before IC
+                       computation (useful for heavy-atom-only analysis).
+    skip_invalid     : If True, molecule records that RDKit cannot parse
+                       are silently skipped.  If False, a ValueError is
+                       raised on the first bad record.
+
+    Returns
+    -------
+    List of MoleculeIC, one per valid molecule record in the file.
+
+    Raises
+    ------
+    FileNotFoundError if *path* does not exist.
+    ValueError        if a molecule fails to parse and skip_invalid=False,
+                      or if no 3-D conformer is present.
+    """
+    path = str(path)
+    if not Path(path).exists():
+        raise FileNotFoundError(f"SDF file not found: {path}")
+
+    stem = Path(path).stem
+
+    supplier = Chem.SDMolSupplier(path, removeHs=remove_hydrogens, sanitize=True)
+
+    molecules: list[MoleculeIC] = []
+
+    for mol_idx, rdmol in enumerate(supplier):
+        if rdmol is None:
+            if skip_invalid:
+                continue
+            raise ValueError(
+                f"Molecule record {mol_idx} in '{path}' could not be parsed."
+            )
+
+        # Ensure a 3-D conformer exists
+        if rdmol.GetNumConformers() == 0:
+            if skip_invalid:
+                continue
+            raise ValueError(
+                f"Molecule record {mol_idx} ('{_mol_name(rdmol, mol_idx)}') "
+                "has no 3-D coordinates."
+            )
+
+        mol_name = _mol_name(rdmol, mol_idx)
+        unique_name = f"{stem}_{mol_name}_{mol_idx}"
+
+        mol_ic = _build_molecule_ic(rdmol, name=unique_name, mol_name=mol_name)
+        molecules.append(mol_ic)
+
+    return molecules
+
+
+# ------------------------------------------------------------------ #
+#  Internal helpers                                                    #
+# ------------------------------------------------------------------ #
+
