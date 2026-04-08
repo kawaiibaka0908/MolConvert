@@ -117,3 +117,13 @@ def _mol_name(rdmol, fallback_idx: int) -> str:
     return name if name else f"mol{fallback_idx}"
 
 
+def _residue_name(mol_name: str) -> str:
+    """
+    Derive a 3-char residue-name-style label from the molecule title.
+    Truncates to 3 characters and uppercases.
+    """
+    cleaned = "".join(c for c in mol_name if c.isalnum())
+    label = cleaned[:3].upper()
+    return label if label else "LIG"
+
+
