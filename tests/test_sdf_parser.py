@@ -70,3 +70,36 @@ def test_atom_names_include_element():
         assert atom.element in atom.atom_name
 
 
+def test_atom_chain_id_default():
+    for mol in parse_sdf(MINI_SDF):
+        assert all(a.chain_id == "A" for a in mol.atoms)
+
+
+def test_atom_residue_seq_default():
+    for mol in parse_sdf(MINI_SDF):
+        assert all(a.residue_seq == 1 for a in mol.atoms)
+
+
+def test_cartesian_positions_stored():
+    for mol in parse_sdf(MINI_SDF):
+        for atom in mol.atoms:
+            assert atom.cart_x is not None
+            assert atom.cart_y is not None
+            assert atom.cart_z is not None
+
+
+def test_first_atom_is_anchor():
+    for mol in parse_sdf(MINI_SDF):
+        assert mol.atoms[0].bond_length is None
+        assert mol.atoms[0].bond_angle  is None
+        assert mol.atoms[0].dihedral    is None
+
+
+def test_second_atom_has_bond_length_only():
+    for mol in parse_sdf(MINI_SDF):
+        a = mol.atoms[1]
+        assert a.bond_length is not None
+        assert a.bond_angle  is None
+        assert a.dihedral    is None
+
+
