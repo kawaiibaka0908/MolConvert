@@ -38,3 +38,35 @@ def test_parse_sdf_molecule_names_unique():
     assert len(names) == len(set(names))
 
 
+def test_parse_sdf_metadata_has_mol_title():
+    mols = parse_sdf(MINI_SDF)
+    for mol in mols:
+        assert "mol_title" in mol.metadata
+
+
+# ------------------------------------------------------------------ #
+#  Atom-level checks                                                   #
+# ------------------------------------------------------------------ #
+
+def test_ethanol_atom_count():
+    mol = parse_sdf(MINI_SDF)[0]   # ethanol: C, C, O, 6H = 9 atoms
+    assert len(mol) == 9
+
+
+def test_acetone_atom_count():
+    mol = parse_sdf(MINI_SDF)[1]   # acetone: C, C, C, O = 4 atoms
+    assert len(mol) == 4
+
+
+def test_atom_serials_one_based():
+    mol = parse_sdf(MINI_SDF)[0]
+    serials = [a.atom_serial for a in mol.atoms]
+    assert serials == list(range(1, len(mol) + 1))
+
+
+def test_atom_names_include_element():
+    mol = parse_sdf(MINI_SDF)[0]
+    for atom in mol.atoms:
+        assert atom.element in atom.atom_name
+
+
