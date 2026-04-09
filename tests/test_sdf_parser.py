@@ -103,3 +103,51 @@ def test_second_atom_has_bond_length_only():
         assert a.dihedral    is None
 
 
+def test_third_atom_has_bond_length_and_angle():
+    for mol in parse_sdf(MINI_SDF):
+        a = mol.atoms[2]
+        assert a.bond_length is not None
+        assert a.bond_angle  is not None
+        assert a.dihedral    is None
+
+
+def test_fourth_atom_has_all_ic():
+    mol = parse_sdf(MINI_SDF)[0]   # ethanol has >= 4 atoms
+    a = mol.atoms[3]
+    assert a.bond_length is not None
+    assert a.bond_angle  is not None
+    assert a.dihedral    is not None
+
+
+def test_ethanol_first_atom_at_origin():
+    mol = parse_sdf(MINI_SDF)[0]
+    a = mol.atoms[0]
+    assert a.cart_x == pytest.approx(0.0)
+    assert a.cart_y == pytest.approx(0.0)
+    assert a.cart_z == pytest.approx(0.0)
+
+
+# ------------------------------------------------------------------ #
+#  Elements                                                            #
+# ------------------------------------------------------------------ #
+
+def test_ethanol_elements():
+    mol = parse_sdf(MINI_SDF)[0]
+    elements = [a.element for a in mol.atoms]
+    assert elements[0] == "C"
+    assert elements[1] == "C"
+    assert elements[2] == "O"
+    assert all(e == "H" for e in elements[3:])
+
+
+def test_acetone_elements():
+    mol = parse_sdf(MINI_SDF)[1]
+    elements = [a.element for a in mol.atoms]
+    assert elements.count("C") == 3
+    assert elements.count("O") == 1
+
+
+# ------------------------------------------------------------------ #
+#  Round-trip reconstruction                                           #
+# ------------------------------------------------------------------ #
+
