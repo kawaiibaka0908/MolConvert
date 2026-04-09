@@ -127,3 +127,62 @@ def _residue_name(mol_name: str) -> str:
     return label if label else "LIG"
 
 
+def _build_molecule_ic(rdmol, name: str, mol_name: str) -> MoleculeIC:
+    """
+    Convert an RDKit Mol (with a 3-D conformer) into a MoleculeIC.
+
+    Atoms are traversed in RDKit atom-block order.  IC values are
+    computed relative to the immediately preceding atoms, matching
+    the PDB parser convention.
+    """
+    conf = rdmol.GetConformer()
+    res_name = _residue_name(mol_name)
+
+    mol_ic = MoleculeIC(
+        name=name,
+        source_fmt="sdf",
+        metadata={"mol_title": mol_name},
+    )
+
+    positions: list[np.ndarray] = []
+
+    for i, atom in enumerate(rdmol.GetAtoms()):
+        rdpos = conf.GetAtomPosition(i)
+        pos = np.array([rdpos.x, rdpos.y, rdpos.z], dtype=float)
+        positions.append(pos)
+
+        # IC values — same depth logic as PDB parser
+        bl: Optional[float] = None
+        ba: Optional[float] = None
+        di: Optional[float] = None
+
+        if i >= 1:
+            bl = _bl(positions[i - 1], pos)
+        if i >= 2:
+            ba = _ba(positions[i - 2], positions[i - 1], pos)
+        if i >= 3:
+            di = _di(positions[i - 3], positions[i - 2], positions[i - 1], pos)
+
+        element = atom.GetSymbol()
+        atom_name = f"{element}{i + 1}"   # e.g. "C1", "O3"
+
+        ic_atom = AtomIC(
+            atom_serial=i + 1,
+            atom_name=atom_name,
+            residue_name=res_name,
+            chain_id="A",
+            residue_seq=1,
+            element=element,
+            bond_length=bl,
+            bond_angle=ba,
+            dihedral=di,
+            bond_to=i if i >= 1 else None,
+            angle_to=i - 1 if i >= 2 else None,
+            dihedral_to=i - 2 if i >= 3 else None,
+            cart_x=float(pos[0]),
+            cart_y=float(pos[1]),
+            cart_z=float(pos[2]),
+        )
+        mol_ic.atoms.append(ic_atom)
+
+    return mol_ic
