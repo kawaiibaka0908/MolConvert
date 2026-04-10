@@ -151,3 +151,54 @@ def test_acetone_elements():
 #  Round-trip reconstruction                                           #
 # ------------------------------------------------------------------ #
 
+def test_sdf_roundtrip_rmsd_realistic():
+    for mol in parse_sdf(MINI_SDF):
+        mol_r = reconstruct(mol)
+        r = rmsd_molecules(mol, mol_r)
+        assert r < 0.5, f"{mol.name}: round-trip RMSD {r:.4f} Å"
+        assert r > 0.0, f"{mol.name}: RMSD is exactly zero — likely a copy"
+
+
+def test_sdf_roundtrip_per_atom_bounded():
+    for mol in parse_sdf(MINI_SDF):
+        orig  = mol.get_positions()
+        recon = reconstruct(mol).get_positions()
+        for i, (p1, p2) in enumerate(zip(orig, recon)):
+            dev = float(np.linalg.norm(p1 - p2))
+            assert dev < 1.0, (
+                f"{mol.name} atom {i} ({mol.atoms[i].atom_name}): "
+                f"deviation {dev:.4f} Å"
+            )
+
+
+# ------------------------------------------------------------------ #
+#  remove_hydrogens option                                             #
+# ------------------------------------------------------------------ #
+
+def test_remove_hydrogens_reduces_atom_count():
+    mols_with_h    = parse_sdf(MINI_SDF, remove_hydrogens=False)
+    mols_without_h = parse_sdf(MINI_SDF, remove_hydrogens=True)
+    for with_h, without_h in zip(mols_with_h, mols_without_h):
+        assert len(without_h) <= len(with_h)
+
+
+def test_remove_hydrogens_no_h_atoms():
+    for mol in parse_sdf(MINI_SDF, remove_hydrogens=True):
+        assert all(a.element != "H" for a in mol.atoms)
+
+
+# ------------------------------------------------------------------ #
+#  Error handling                                                      #
+# ------------------------------------------------------------------ #
+
+def test_missing_file_raises():
+    with pytest.raises(FileNotFoundError):
+        parse_sdf("nonexistent.sdf")
+
+
+def test_skip_invalid_default_does_not_raise(tmp_path):
+    bad_sdf = tmp_path / "bad.sdf"
+    bad_sdf.write_text("not a valid sdf\n$$$$\n")
+    # Should not raise — invalid record is skipped
+    result = parse_sdf(str(bad_sdf), skip_invalid=True)
+    assert isinstance(result, list)
