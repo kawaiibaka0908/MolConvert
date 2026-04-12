@@ -117,3 +117,13 @@ def zmat_to_molecule(text: str) -> MoleculeIC:
     return MoleculeIC(name=name, source_fmt=source_fmt, atoms=atoms, metadata=metadata)
 
 
+def load_zmat(path: str) -> MoleculeIC:
+    """Read a .zmat file and return a MoleculeIC."""
+    with open(path) as fh:
+        return zmat_to_molecule(fh.read())
+
+
+# ------------------------------------------------------------------ #
+#  Internal helpers                                                    #
+# ------------------------------------------------------------------ #
+
