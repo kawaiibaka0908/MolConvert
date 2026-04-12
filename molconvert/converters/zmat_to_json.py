@@ -127,3 +127,12 @@ def load_zmat(path: str) -> MoleculeIC:
 #  Internal helpers                                                    #
 # ------------------------------------------------------------------ #
 
+def _element_from_name(atom_name: str) -> str:
+    """
+    Derive an element symbol from an atom name.
+
+    Examples: 'N' → 'N', 'CA' → 'C', 'OD1' → 'O', 'HG11' → 'H'
+    Strips leading digits first to handle names like '1HB'.
+    """
+    stripped = atom_name.lstrip("0123456789")
+    return (stripped[0] if stripped else atom_name[0]).upper()
