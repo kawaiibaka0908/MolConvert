@@ -90,3 +90,8 @@ def molecule_to_zmat(mol: MoleculeIC) -> str:
     return "\n".join(lines)
 
 
+def save_zmat(mol: MoleculeIC, path: str) -> None:
+    """Write a MoleculeIC to a .zmat file."""
+    with open(path, "w") as fh:
+        fh.write(molecule_to_zmat(mol))
+        fh.write("\n")
