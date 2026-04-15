@@ -95,3 +95,41 @@ def reconstruct(mol: MoleculeIC) -> MoleculeIC:
     return result
 
 
+def to_pdb(mol: MoleculeIC, model_id: Optional[int] = None) -> str:
+    """
+    Format a *fully-positioned* MoleculeIC as a PDB string.
+
+    Parameters
+    ----------
+    mol      : MoleculeIC with cart_x/y/z set on every atom.
+    model_id : If given, wrap output in MODEL/ENDMDL records.
+
+    Returns
+    -------
+    str — PDB-formatted text (no trailing newline on the END line).
+
+    Raises
+    ------
+    ValueError if any atom lacks Cartesian coordinates.
+    """
+    lines: list[str] = []
+
+    if model_id is not None:
+        lines.append(f"MODEL     {model_id:4d}")
+
+    for atom in mol.atoms:
+        if atom.position is None:
+            raise ValueError(
+                f"Atom {atom.atom_serial} ({atom.atom_name}) has no "
+                "Cartesian position — run reconstruct() first."
+            )
+
+        lines.append(_format_atom_record(atom))
+
+    if model_id is not None:
+        lines.append("ENDMDL")
+
+    lines.append("END")
+    return "\n".join(lines)
+
+
