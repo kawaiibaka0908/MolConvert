@@ -133,3 +133,14 @@ def to_pdb(mol: MoleculeIC, model_id: Optional[int] = None) -> str:
     return "\n".join(lines)
 
 
+def save_pdb(mol: MoleculeIC, path: str, model_id: Optional[int] = None) -> None:
+    """Write *mol* to *path* as a PDB file."""
+    with open(path, "w") as fh:
+        fh.write(to_pdb(mol, model_id=model_id))
+        fh.write("\n")
+
+
+# ------------------------------------------------------------------ #
+#  Internal helpers                                                    #
+# ------------------------------------------------------------------ #
+
