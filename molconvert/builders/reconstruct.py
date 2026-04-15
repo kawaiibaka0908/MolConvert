@@ -144,3 +144,19 @@ def save_pdb(mol: MoleculeIC, path: str, model_id: Optional[int] = None) -> None
 #  Internal helpers                                                    #
 # ------------------------------------------------------------------ #
 
+def _require_ic(atom: AtomIC, need_dihedral: bool) -> None:
+    """Raise ValueError if a required IC field is None."""
+    missing = []
+    if atom.bond_length is None:
+        missing.append("bond_length")
+    if atom.bond_angle is None:
+        missing.append("bond_angle")
+    if need_dihedral and atom.dihedral is None:
+        missing.append("dihedral")
+    if missing:
+        raise ValueError(
+            f"Atom {atom.atom_serial} ({atom.atom_name}) is missing IC "
+            f"fields: {', '.join(missing)}"
+        )
+
+
