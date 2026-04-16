@@ -135,3 +135,41 @@ def test_to_pdb_atom_names_present(mol_recon):
         assert atom.atom_name in pdb_text
 
 
+def test_to_pdb_with_model_id(mol_recon):
+    pdb_text = to_pdb(mol_recon, model_id=1)
+    assert "MODEL" in pdb_text
+    assert "ENDMDL" in pdb_text
+
+
+def test_to_pdb_without_model_id_no_model_record(mol_recon):
+    pdb_text = to_pdb(mol_recon)
+    assert "MODEL" not in pdb_text
+
+
+def test_to_pdb_missing_position_raises(mol_orig):
+    bad = copy.deepcopy(mol_orig)
+    bad.atoms[0].cart_x = None
+    with pytest.raises(ValueError, match="no Cartesian position"):
+        to_pdb(bad)
+
+
+# ------------------------------------------------------------------ #
+#  save_pdb                                                            #
+# ------------------------------------------------------------------ #
+
+def test_save_pdb_writes_file(mol_recon):
+    with tempfile.NamedTemporaryFile(suffix=".pdb", delete=False, mode="w") as f:
+        path = f.name
+    save_pdb(mol_recon, path)
+    content = Path(path).read_text()
+    assert "ATOM" in content
+    assert "END" in content
+
+
+def test_save_pdb_file_matches_to_pdb(mol_recon):
+    with tempfile.NamedTemporaryFile(suffix=".pdb", delete=False, mode="w") as f:
+        path = f.name
+    save_pdb(mol_recon, path)
+    saved = Path(path).read_text().strip()
+    expected = to_pdb(mol_recon).strip()
+    assert saved == expected
