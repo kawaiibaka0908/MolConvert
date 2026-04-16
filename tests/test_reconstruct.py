@@ -103,3 +103,35 @@ def test_reconstruct_missing_bond_length_raises(mol_orig):
         reconstruct(bad_mol)
 
 
+def test_reconstruct_empty_molecule():
+    empty = MoleculeIC(name="empty", source_fmt="pdb")
+    result = reconstruct(empty)
+    assert len(result) == 0
+
+
+# ------------------------------------------------------------------ #
+#  to_pdb                                                              #
+# ------------------------------------------------------------------ #
+
+def test_to_pdb_returns_string(mol_recon):
+    pdb_text = to_pdb(mol_recon)
+    assert isinstance(pdb_text, str)
+
+
+def test_to_pdb_contains_atom_records(mol_recon):
+    pdb_text = to_pdb(mol_recon)
+    atom_lines = [l for l in pdb_text.splitlines() if l.startswith("ATOM")]
+    assert len(atom_lines) == len(mol_recon.atoms)
+
+
+def test_to_pdb_ends_with_end(mol_recon):
+    pdb_text = to_pdb(mol_recon)
+    assert pdb_text.strip().endswith("END")
+
+
+def test_to_pdb_atom_names_present(mol_recon):
+    pdb_text = to_pdb(mol_recon)
+    for atom in mol_recon.atoms:
+        assert atom.atom_name in pdb_text
+
+
