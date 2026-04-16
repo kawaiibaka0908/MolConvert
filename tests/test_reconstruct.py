@@ -62,3 +62,44 @@ def test_reconstruct_all_positions_set(mol_recon):
 #  Numerical accuracy                                                  #
 # ------------------------------------------------------------------ #
 
+def test_reconstruct_rmsd_realistic(mol_orig, mol_recon):
+    orig  = mol_orig.get_positions()
+    recon = mol_recon.get_positions()
+    diff  = orig - recon
+    rmsd  = float(np.sqrt(np.mean(np.sum(diff ** 2, axis=1))))
+    # Angles/dihedrals are rounded to 0.01° before NeRF placement, so
+    # reconstruction is deliberately imprecise (not a trivial coordinate copy).
+    assert rmsd < 0.5,  f"Round-trip RMSD too large: {rmsd:.4f} Å"
+    assert rmsd > 0.0,  f"Round-trip RMSD is exactly zero — coordinates were copied, not reconstructed"
+
+
+def test_reconstruct_per_atom_deviation_bounded(mol_orig, mol_recon):
+    orig  = mol_orig.get_positions()
+    recon = mol_recon.get_positions()
+    for i, (p1, p2) in enumerate(zip(orig, recon)):
+        dev = float(np.linalg.norm(p1 - p2))
+        assert dev < 1.0, (
+            f"Atom {i} ({mol_orig.atoms[i].atom_name}) deviation too large: {dev:.4f} Å"
+        )
+
+
+# ------------------------------------------------------------------ #
+#  Error handling                                                      #
+# ------------------------------------------------------------------ #
+
+def test_reconstruct_missing_anchor_position_raises(mol_orig):
+    bad_mol = copy.deepcopy(mol_orig)
+    bad_mol.atoms[0].cart_x = None
+    bad_mol.atoms[0].cart_y = None
+    bad_mol.atoms[0].cart_z = None
+    with pytest.raises(ValueError, match="no Cartesian position"):
+        reconstruct(bad_mol)
+
+
+def test_reconstruct_missing_bond_length_raises(mol_orig):
+    bad_mol = copy.deepcopy(mol_orig)
+    bad_mol.atoms[3].bond_length = None   # atom index 3 needs full IC
+    with pytest.raises(ValueError, match="bond_length"):
+        reconstruct(bad_mol)
+
+
