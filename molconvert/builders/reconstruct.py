@@ -160,3 +160,51 @@ def _require_ic(atom: AtomIC, need_dihedral: bool) -> None:
         )
 
 
+def _format_atom_record(atom: AtomIC) -> str:
+    """
+    Format one AtomIC as a PDB ATOM record (80 chars wide).
+
+    PDB column layout (1-indexed, fixed-width):
+      1-6   : Record name ("ATOM  ")
+      7-11  : Serial number
+      13-16 : Atom name (left-justified for 1-char elements, else col 13)
+      17    : Alt loc indicator (blank)
+      18-20 : Residue name
+      22    : Chain ID
+      23-26 : Residue sequence number
+      27    : Code for insertion of residues (blank)
+      31-38 : x (8.3f)
+      39-46 : y (8.3f)
+      47-54 : z (8.3f)
+      55-60 : Occupancy (6.2f)
+      61-66 : B-factor (6.2f)
+      77-78 : Element symbol (right-justified)
+    """
+    # Atom name formatting: 1-char element → col 14 (pad left with space);
+    # 4-char names (e.g. "HG11") → start at col 13.
+    name = atom.atom_name
+    if len(name) < 4:
+        name_field = f" {name:<3s}"   # " CA " style
+    else:
+        name_field = f"{name:<4s}"    # "HG11" style
+
+    x, y, z = atom.cart_x, atom.cart_y, atom.cart_z
+
+    record = (
+        f"{'ATOM':<6s}"              # cols  1-6
+        f"{atom.atom_serial:5d} "   # cols  7-12 (serial + space)
+        f"{name_field}"              # cols 13-16
+        f" "                         # col  17 (alt loc)
+        f"{atom.residue_name:<3s} " # cols 18-21
+        f"{atom.chain_id}"          # col  22
+        f"{atom.residue_seq:4d}"    # cols 23-26
+        f"    "                      # cols 27-30 (iCode + 3 spaces)
+        f"{x:8.3f}"                 # cols 31-38
+        f"{y:8.3f}"                 # cols 39-46
+        f"{z:8.3f}"                 # cols 47-54
+        f"  1.00"                   # cols 55-60 (occupancy)
+        f"  0.00"                   # cols 61-66 (B-factor)
+        f"          "               # cols 67-76 (blank)
+        f"{atom.element:>2s}"       # cols 77-78
+    )
+    return record
