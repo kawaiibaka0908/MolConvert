@@ -85,3 +85,8 @@ def save_sdf(mol: MoleculeIC, path: str) -> None:
         fh.write("\n")
 
 
+def molecules_to_sdf(mols: list[MoleculeIC]) -> str:
+    """Convert a list of MoleculeIC objects to a multi-record SDF string."""
+    return "\n".join(molecule_to_sdf(m) for m in mols)
+
+
