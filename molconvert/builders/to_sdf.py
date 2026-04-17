@@ -78,3 +78,10 @@ def molecule_to_sdf(mol: MoleculeIC) -> str:
     return "\n".join(lines)
 
 
+def save_sdf(mol: MoleculeIC, path: str) -> None:
+    """Write one MoleculeIC to a .sdf file (single record)."""
+    with open(path, "w") as fh:
+        fh.write(molecule_to_sdf(mol))
+        fh.write("\n")
+
+
