@@ -36,3 +36,45 @@ _BOND_TOLERANCE = 1.3    # accept distances up to 130 % of covalent-radii sum
 #  Public API                                                          #
 # ------------------------------------------------------------------ #
 
+def molecule_to_sdf(mol: MoleculeIC) -> str:
+    """
+    Convert a fully-positioned MoleculeIC to a single SDF V2000 record.
+
+    Bond connectivity is inferred from interatomic distances.
+    All bonds are written as type 1 (single).
+
+    Raises
+    ------
+    ValueError if any atom lacks Cartesian coordinates.
+    """
+    _require_positions(mol)
+
+    mol_title = mol.metadata.get("mol_title", mol.name)
+    bonds     = _infer_bonds(mol.atoms)
+    n_atoms   = len(mol.atoms)
+    n_bonds   = len(bonds)
+
+    lines: list[str] = []
+
+    # ---- Header block (3 lines) ----
+    lines.append(mol_title)
+    lines.append("     molconvert          3D")
+    lines.append("")
+
+    # ---- Counts line ----
+    lines.append(f"{n_atoms:3d}{n_bonds:3d}  0  0  0  0  0  0  0  0999 V2000")
+
+    # ---- Atom block ----
+    for atom in mol.atoms:
+        lines.append(_atom_line(atom))
+
+    # ---- Bond block ----
+    for a1_idx, a2_idx, btype in bonds:
+        lines.append(f"{a1_idx:3d}{a2_idx:3d}{btype:3d}  0")
+
+    lines.append("M  END")
+    lines.append("$$$$")
+
+    return "\n".join(lines)
+
+
