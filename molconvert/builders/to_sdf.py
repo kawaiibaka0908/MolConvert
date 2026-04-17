@@ -90,3 +90,14 @@ def molecules_to_sdf(mols: list[MoleculeIC]) -> str:
     return "\n".join(molecule_to_sdf(m) for m in mols)
 
 
+def save_sdf_multi(mols: list[MoleculeIC], path: str) -> None:
+    """Write multiple MoleculeIC objects to a single multi-record SDF file."""
+    with open(path, "w") as fh:
+        fh.write(molecules_to_sdf(mols))
+        fh.write("\n")
+
+
+# ------------------------------------------------------------------ #
+#  Internal helpers                                                    #
+# ------------------------------------------------------------------ #
+
