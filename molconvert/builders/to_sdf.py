@@ -101,3 +101,12 @@ def save_sdf_multi(mols: list[MoleculeIC], path: str) -> None:
 #  Internal helpers                                                    #
 # ------------------------------------------------------------------ #
 
+def _require_positions(mol: MoleculeIC) -> None:
+    for atom in mol.atoms:
+        if atom.cart_x is None:
+            raise ValueError(
+                f"Atom {atom.atom_serial} ({atom.atom_name}) has no "
+                "Cartesian position — run reconstruct() first."
+            )
+
+
