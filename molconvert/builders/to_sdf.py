@@ -122,3 +122,28 @@ def _atom_line(atom: AtomIC) -> str:
     )
 
 
+def _infer_bonds(atoms: list[AtomIC]) -> list[tuple[int, int, int]]:
+    """
+    Infer bond pairs from interatomic distances.
+
+    Returns list of (atom1_1based, atom2_1based, bond_type=1).
+    """
+    bonds: list[tuple[int, int, int]] = []
+    n = len(atoms)
+
+    # Pre-extract positions and radii to avoid repeated attribute lookups
+    xs = [a.cart_x for a in atoms]
+    ys = [a.cart_y for a in atoms]
+    zs = [a.cart_z for a in atoms]
+    radii = [_COVALENT_RADII.get(a.element, _DEFAULT_RADIUS) for a in atoms]
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            threshold = (radii[i] + radii[j]) * _BOND_TOLERANCE
+            dx = xs[i] - xs[j]
+            dy = ys[i] - ys[j]
+            dz = zs[i] - zs[j]
+            if dx*dx + dy*dy + dz*dz < threshold * threshold:
+                bonds.append((i + 1, j + 1, 1))
+
+    return bonds
