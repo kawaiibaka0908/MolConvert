@@ -110,3 +110,15 @@ def _require_positions(mol: MoleculeIC) -> None:
             )
 
 
+def _atom_line(atom: AtomIC) -> str:
+    """Format one AtomIC as a V2000 atom block line."""
+    elem = f"{atom.element:<3s}"
+    return (
+        f"{atom.cart_x:10.4f}"
+        f"{atom.cart_y:10.4f}"
+        f"{atom.cart_z:10.4f}"
+        f" {elem}"
+        " 0  0  0  0  0  0  0  0  0  0  0  0"
+    )
+
+
