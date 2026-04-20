@@ -131,3 +131,74 @@ def test_sdf_atom_block_length(ethanol_sdf):
     assert len(_atom_coord_lines(ethanol_sdf)) == 9
 
 
+def test_sdf_atom_coordinates_present(ethanol_sdf):
+    assert len(_atom_coord_lines(ethanol_sdf)) == 9
+
+
+def test_sdf_first_atom_at_origin(ethanol_sdf):
+    x, y, z = _atom_coord_lines(ethanol_sdf)[0]
+    assert x == pytest.approx(0.0, abs=1e-3)
+    assert y == pytest.approx(0.0, abs=1e-3)
+    assert z == pytest.approx(0.0, abs=1e-3)
+
+
+# ------------------------------------------------------------------ #
+#  to_sdf — bond inference correctness                                 #
+# ------------------------------------------------------------------ #
+
+def test_bond_count_ethanol(ethanol):
+    from molconvert.builders.to_sdf import _infer_bonds
+    bonds = _infer_bonds(ethanol.atoms)
+    assert len(bonds) == 8
+
+
+def test_bond_count_acetone(acetone):
+    from molconvert.builders.to_sdf import _infer_bonds
+    bonds = _infer_bonds(acetone.atoms)
+    assert len(bonds) == 3
+
+
+def test_bonds_are_1based(ethanol):
+    from molconvert.builders.to_sdf import _infer_bonds
+    bonds = _infer_bonds(ethanol.atoms)
+    for a1, a2, _ in bonds:
+        assert a1 >= 1
+        assert a2 >= 1
+        assert a1 <= len(ethanol.atoms)
+        assert a2 <= len(ethanol.atoms)
+
+
+def test_all_bond_types_are_single(ethanol):
+    from molconvert.builders.to_sdf import _infer_bonds
+    bonds = _infer_bonds(ethanol.atoms)
+    assert all(btype == 1 for _, _, btype in bonds)
+
+
+def test_no_self_bonds(ethanol):
+    from molconvert.builders.to_sdf import _infer_bonds
+    bonds = _infer_bonds(ethanol.atoms)
+    assert all(a1 != a2 for a1, a2, _ in bonds)
+
+
+# ------------------------------------------------------------------ #
+#  to_sdf — file I/O                                                   #
+# ------------------------------------------------------------------ #
+
+def test_save_sdf_creates_file(ethanol, tmp_path):
+    out = str(tmp_path / "out.sdf")
+    save_sdf(ethanol, out)
+    assert Path(out).exists()
+
+
+def test_save_sdf_content_matches_string(ethanol, tmp_path):
+    out = str(tmp_path / "out.sdf")
+    save_sdf(ethanol, out)
+    assert Path(out).read_text().strip() == molecule_to_sdf(ethanol).strip()
+
+
+def test_molecules_to_sdf_has_two_records():
+    mols = parse_sdf(MINI_SDF)
+    text = molecules_to_sdf(mols)
+    assert text.count("$$$$") == 2
+
+
