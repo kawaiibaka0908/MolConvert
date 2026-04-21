@@ -293,3 +293,91 @@ def test_cli_sdf_to_zmat_stdout(capsys):
     assert "END" in out
 
 
+def test_cli_sdf_to_pdb_file(tmp_path, capsys):
+    out_path = str(tmp_path / "out.pdb")
+    run_convert([MINI_SDF, "--to", "pdb", "-o", out_path])
+    assert Path(out_path).exists()
+    content = Path(out_path).read_text()
+    assert "ATOM" in content
+
+
+def test_cli_sdf_to_sdf_file(tmp_path, capsys):
+    out_path = str(tmp_path / "out.sdf")
+    run_convert([MINI_SDF, "--to", "sdf", "-o", out_path])
+    assert Path(out_path).exists()
+    content = Path(out_path).read_text()
+    assert content.count("$$$$") == 2
+
+
+def test_cli_sdf_remove_hydrogens(capsys):
+    run_convert([MINI_SDF, "--to", "pdb", "--remove-hydrogens"])
+    out, _ = capsys.readouterr()
+    atom_lines = [l for l in out.splitlines() if l.startswith("ATOM")]
+    # ethanol heavy atoms: C,C,O = 3; acetone heavy atoms: C,C,C,O = 4
+    assert len(atom_lines) == 7
+
+
+# ------------------------------------------------------------------ #
+#  CLI — PDB input → SDF output                                        #
+# ------------------------------------------------------------------ #
+
+def test_cli_pdb_to_sdf_stdout(capsys):
+    run_convert([MINI_PDB, "--to", "sdf"])
+    out, _ = capsys.readouterr()
+    assert "V2000" in out
+    assert "$$$$" in out
+
+
+def test_cli_pdb_to_sdf_atom_count(capsys):
+    run_convert([MINI_PDB, "--to", "sdf"])
+    out, _ = capsys.readouterr()
+    counts = [l for l in out.splitlines() if "V2000" in l][0]
+    assert int(counts[:3]) == 5   # mini.pdb has 5 atoms
+
+
+def test_cli_pdb_to_sdf_file(tmp_path, capsys):
+    out_path = str(tmp_path / "out.sdf")
+    run_convert([MINI_PDB, "--to", "sdf", "-o", out_path])
+    assert Path(out_path).exists()
+
+
+# ------------------------------------------------------------------ #
+#  CLI — ZMAT input → SDF output                                       #
+# ------------------------------------------------------------------ #
+
+def test_cli_zmat_to_sdf_stdout(tmp_path, capsys):
+    from molconvert.converters.json_to_zmat import save_zmat
+    mol = parse_pdb(MINI_PDB)[0]
+    zmat_path = str(tmp_path / "mol.zmat")
+    save_zmat(mol, zmat_path)
+
+    run_convert([zmat_path, "--to", "sdf"])
+    out, _ = capsys.readouterr()
+    assert "V2000" in out
+    assert "$$$$" in out
+
+
+def test_cli_zmat_to_sdf_atom_count(tmp_path, capsys):
+    from molconvert.converters.json_to_zmat import save_zmat
+    mol = parse_pdb(MINI_PDB)[0]
+    zmat_path = str(tmp_path / "mol.zmat")
+    save_zmat(mol, zmat_path)
+
+    run_convert([zmat_path, "--to", "sdf"])
+    out, _ = capsys.readouterr()
+    counts = [l for l in out.splitlines() if "V2000" in l][0]
+    assert int(counts[:3]) == 5
+
+
+# ------------------------------------------------------------------ #
+#  CLI — error paths                                                   #
+# ------------------------------------------------------------------ #
+
+def test_cli_missing_sdf_exits():
+    with pytest.raises(SystemExit):
+        run_convert(["ghost.sdf", "--to", "pdb"])
+
+
+def test_cli_unsupported_extension_exits():
+    with pytest.raises(SystemExit):
+        run_convert(["molecule.mol2"])
