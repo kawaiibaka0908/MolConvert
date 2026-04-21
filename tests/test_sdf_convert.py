@@ -202,3 +202,94 @@ def test_molecules_to_sdf_has_two_records():
     assert text.count("$$$$") == 2
 
 
+def test_save_sdf_multi_creates_file(tmp_path):
+    mols = parse_sdf(MINI_SDF)
+    out = str(tmp_path / "multi.sdf")
+    save_sdf_multi(mols, out)
+    assert Path(out).exists()
+    content = Path(out).read_text()
+    assert content.count("$$$$") == 2
+
+
+def test_to_sdf_raises_without_positions():
+    from molconvert.converters.zmat_to_json import zmat_to_molecule
+    from molconvert.converters.json_to_zmat import molecule_to_zmat
+    mol = parse_sdf(MINI_SDF)[0]
+    zmat_text = molecule_to_zmat(mol)
+    mol_no_pos = zmat_to_molecule(zmat_text)
+    # Non-anchor atoms have no positions yet
+    with pytest.raises(ValueError):
+        molecule_to_sdf(mol_no_pos)
+
+
+# ------------------------------------------------------------------ #
+#  Round-trip: SDF → MoleculeIC → SDF                                 #
+# ------------------------------------------------------------------ #
+
+def test_sdf_roundtrip_atom_count_ethanol(ethanol_sdf):
+    counts = [l for l in ethanol_sdf.splitlines() if "V2000" in l][0]
+    assert int(counts[:3]) == 9
+
+
+def test_sdf_roundtrip_bond_count_ethanol(ethanol_sdf):
+    counts = [l for l in ethanol_sdf.splitlines() if "V2000" in l][0]
+    assert int(counts[3:6]) == 8
+
+
+def test_sdf_roundtrip_rmsd_near_zero(ethanol):
+    sdf_text = molecule_to_sdf(ethanol)
+    # Parse back via RDKit-based sdf_parser (write to tmp file)
+    import tempfile, os
+    with tempfile.NamedTemporaryFile(suffix=".sdf", mode="w", delete=False) as f:
+        f.write(sdf_text + "\n")
+        tmp = f.name
+    try:
+        mols_back = parse_sdf(tmp)
+        assert len(mols_back) == 1
+        r = rmsd_molecules(ethanol, mols_back[0])
+        assert r < 1e-3
+    finally:
+        os.unlink(tmp)
+
+
+# ------------------------------------------------------------------ #
+#  CLI — SDF input paths                                               #
+# ------------------------------------------------------------------ #
+
+def test_cli_sdf_to_pdb_stdout(capsys):
+    run_convert([MINI_SDF, "--to", "pdb"])
+    out, _ = capsys.readouterr()
+    atom_lines = [l for l in out.splitlines() if l.startswith("ATOM")]
+    assert len(atom_lines) == 13   # ethanol 9 + acetone 4
+
+
+def test_cli_sdf_to_pdb_uses_model_records(capsys):
+    run_convert([MINI_SDF, "--to", "pdb"])
+    out, _ = capsys.readouterr()
+    assert "MODEL" in out
+
+
+def test_cli_sdf_to_json_stdout(capsys):
+    run_convert([MINI_SDF, "--to", "json"])
+    out, _ = capsys.readouterr()
+    # Multiple JSON objects — take first
+    first_json = out.strip().split("\n{")[0]
+    data = json.loads(first_json)
+    assert "atoms" in data
+    assert data["source_fmt"] == "sdf"
+
+
+def test_cli_sdf_to_sdf_stdout(capsys):
+    run_convert([MINI_SDF, "--to", "sdf"])
+    out, _ = capsys.readouterr()
+    assert out.count("$$$$") == 2
+    assert "V2000" in out
+
+
+def test_cli_sdf_to_zmat_stdout(capsys):
+    run_convert([MINI_SDF, "--to", "zmat"])
+    out, _ = capsys.readouterr()
+    assert out.startswith("ZMAT ")
+    assert "END" in out
+
+
