@@ -208,3 +208,73 @@ def kabsch_rmsd(coords1: np.ndarray, coords2: np.ndarray) -> float:
 #  Naïve RMSD (no superposition)                                       #
 # ------------------------------------------------------------------ #
 
+def rmsd(coords1: np.ndarray, coords2: np.ndarray) -> float:
+    """
+    Naïve RMSD — no superposition. Assumes structures are already aligned.
+
+    Parameters
+    ----------
+    coords1, coords2 : (N, 3) float arrays — must have the same shape.
+
+    Returns
+    -------
+    float — RMSD in Angstroms.
+    """
+    c1 = np.asarray(coords1, dtype=float)
+    c2 = np.asarray(coords2, dtype=float)
+    if c1.shape != c2.shape:
+        raise ValueError(
+            f"Shape mismatch: coords1 {c1.shape} vs coords2 {c2.shape}"
+        )
+    if len(c1) == 0:
+        return 0.0
+    diff = c1 - c2
+    return float(np.sqrt(np.mean(np.sum(diff ** 2, axis=1))))
+
+
+# ------------------------------------------------------------------ #
+#  Molecule-level helpers                                              #
+# ------------------------------------------------------------------ #
+
+def rmsd_molecules(
+    mol1: MoleculeIC,
+    mol2: MoleculeIC,
+    atom_filter: Optional[list[str]] = None,
+    superpose: bool = True,
+) -> float:
+    """
+    RMSD between two MoleculeIC objects.
+
+    Parameters
+    ----------
+    mol1, mol2   : Molecules to compare — must have Cartesian positions set.
+    atom_filter  : If given, only atoms whose ``atom_name`` is in this list
+                   are included.  E.g. ``["CA"]`` gives Cα-only RMSD.
+    superpose    : If True (default), apply Kabsch optimal superposition before
+                   computing RMSD.
+
+    Returns
+    -------
+    float — RMSD in Angstroms.
+    """
+    coords1 = _extract_coords(mol1, atom_filter)
+    coords2 = _extract_coords(mol2, atom_filter)
+
+    if len(coords1) != len(coords2):
+        label = f" (filter={atom_filter})" if atom_filter else ""
+        raise ValueError(
+            f"Atom count mismatch{label}: "
+            f"{mol1.name} has {len(coords1)}, {mol2.name} has {len(coords2)}"
+        )
+
+    if len(coords1) == 0:
+        return 0.0
+
+    if superpose:
+        if len(coords1) < 3:
+            # Fall back to naïve RMSD when too few atoms for Kabsch
+            return rmsd(coords1, coords2)
+        return kabsch_rmsd(coords1, coords2)
+    return rmsd(coords1, coords2)
+
+
