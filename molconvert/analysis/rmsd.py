@@ -378,3 +378,51 @@ class ICSummary:
         return "\n".join(lines)
 
 
+def ic_summary(mol: MoleculeIC) -> ICSummary:
+    """Compute descriptive statistics for the IC values stored in *mol*."""
+    bond_lengths = []
+    bond_angles  = []
+    dihedrals    = []
+    n_anchors    = 0
+
+    for atom in mol.atoms:
+        if atom.bond_length is None:
+            n_anchors += 1
+            continue
+        bond_lengths.append(atom.bond_length)
+        if atom.bond_angle is not None:
+            bond_angles.append(atom.bond_angle)
+        if atom.dihedral is not None:
+            dihedrals.append(atom.dihedral)
+
+    def _stats(values: list[float]) -> tuple[float, float, float, float]:
+        if not values:
+            return 0.0, 0.0, 0.0, 0.0
+        arr = np.array(values)
+        return (
+            float(np.mean(arr)),
+            float(np.std(arr)),
+            float(np.min(arr)),
+            float(np.max(arr)),
+        )
+
+    bl_mean, bl_std, bl_min, bl_max = _stats(bond_lengths)
+    ba_mean, ba_std, ba_min, ba_max = _stats(bond_angles)
+    di_mean, di_std, di_min, di_max = _stats(dihedrals)
+
+    return ICSummary(
+        n_atoms=len(mol.atoms),
+        n_anchors=n_anchors,
+        bond_length_mean=bl_mean, bond_length_std=bl_std,
+        bond_length_min=bl_min,   bond_length_max=bl_max,
+        bond_angle_mean=ba_mean,  bond_angle_std=ba_std,
+        bond_angle_min=ba_min,    bond_angle_max=ba_max,
+        dihedral_mean=di_mean,    dihedral_std=di_std,
+        dihedral_min=di_min,      dihedral_max=di_max,
+    )
+
+
+# ------------------------------------------------------------------ #
+#  Internal helpers                                                    #
+# ------------------------------------------------------------------ #
+
