@@ -278,3 +278,66 @@ def rmsd_molecules(
     return rmsd(coords1, coords2)
 
 
+def per_atom_deviation(
+    mol1: MoleculeIC,
+    mol2: MoleculeIC,
+    atom_filter: Optional[list[str]] = None,
+    superpose: bool = True,
+) -> list[dict]:
+    """
+    Per-atom distance between corresponding atoms in two molecules.
+
+    Returns
+    -------
+    List of dicts, one per atom pair::
+
+        {
+            "atom_serial": int,
+            "atom_name":   str,
+            "residue_name": str,
+            "residue_seq":  int,
+            "chain_id":     str,
+            "deviation":    float,   # Angstroms
+        }
+    """
+    atoms1 = _filter_atoms(mol1, atom_filter)
+    atoms2 = _filter_atoms(mol2, atom_filter)
+
+    if len(atoms1) != len(atoms2):
+        label = f" (filter={atom_filter})" if atom_filter else ""
+        raise ValueError(
+            f"Atom count mismatch{label}: "
+            f"{mol1.name} has {len(atoms1)}, {mol2.name} has {len(atoms2)}"
+        )
+
+    coords1 = np.array([a.position for a in atoms1], dtype=float)
+    coords2 = np.array([a.position for a in atoms2], dtype=float)
+
+    if superpose and len(coords1) >= 3:
+        coords2 = kabsch_superpose(coords1, coords2)
+
+    results = []
+    for i, (a1, a2) in enumerate(zip(atoms1, atoms2)):
+        if a1.position is None or a2.position is None:
+            raise ValueError(
+                f"Atom {a1.atom_serial} ({a1.atom_name}) is missing "
+                "Cartesian coordinates in one or both molecules."
+            )
+        dev = float(np.linalg.norm(coords1[i] - coords2[i]))
+        results.append({
+            "atom_serial":  a1.atom_serial,
+            "atom_name":    a1.atom_name,
+            "residue_name": a1.residue_name,
+            "residue_seq":  a1.residue_seq,
+            "chain_id":     a1.chain_id,
+            "deviation":    dev,
+        })
+
+    return results
+
+
+# ------------------------------------------------------------------ #
+#  IC statistics                                                       #
+# ------------------------------------------------------------------ #
+
+@dataclass
