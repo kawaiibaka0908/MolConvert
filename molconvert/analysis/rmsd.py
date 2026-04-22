@@ -162,3 +162,49 @@ def kabsch_align(
 #  Convenience wrappers (use kabsch_align internally)                  #
 # ------------------------------------------------------------------ #
 
+def kabsch_superpose(coords1: np.ndarray, coords2: np.ndarray) -> np.ndarray:
+    """
+    Return coords2 after optimal superposition onto coords1 (reference).
+
+    Parameters
+    ----------
+    coords1 : (N, 3) reference.
+    coords2 : (N, 3) target — this is the array that gets rotated.
+
+    Returns
+    -------
+    (N, 3) array — coords2 rotated and translated to best fit coords1.
+    """
+    _R, _t, _rmsd = kabsch_align(coords1, coords2)
+    c2 = np.asarray(coords2, dtype=np.float64)
+    centroid2 = c2.mean(axis=0)
+    Y = c2 - centroid2
+    c1 = np.asarray(coords1, dtype=np.float64)
+    centroid1 = c1.mean(axis=0)
+    return Y @ _R + centroid1
+
+
+def kabsch_rmsd(coords1: np.ndarray, coords2: np.ndarray) -> float:
+    """
+    RMSD between two coordinate sets after Kabsch optimal superposition.
+
+    Rotates coords2 to best fit coords1, then returns the RMSD.
+    Equivalent to what PyMOL / VMD report after alignment.
+
+    Parameters
+    ----------
+    coords1 : (N, 3) reference.
+    coords2 : (N, 3) target.
+
+    Returns
+    -------
+    float — RMSD in Angstroms.
+    """
+    _R, _t, rmsd_val = kabsch_align(coords1, coords2)
+    return rmsd_val
+
+
+# ------------------------------------------------------------------ #
+#  Naïve RMSD (no superposition)                                       #
+# ------------------------------------------------------------------ #
+
