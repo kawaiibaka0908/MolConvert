@@ -341,3 +341,40 @@ def per_atom_deviation(
 # ------------------------------------------------------------------ #
 
 @dataclass
+class ICSummary:
+    """Descriptive statistics for the IC values in a MoleculeIC."""
+
+    n_atoms: int
+    n_anchors: int
+
+    bond_length_mean: float
+    bond_length_std:  float
+    bond_length_min:  float
+    bond_length_max:  float
+
+    bond_angle_mean: float
+    bond_angle_std:  float
+    bond_angle_min:  float
+    bond_angle_max:  float
+
+    dihedral_mean: float
+    dihedral_std:  float
+    dihedral_min:  float
+    dihedral_max:  float
+
+    def __str__(self) -> str:
+        lines = [
+            f"IC Summary — {self.n_atoms} atoms ({self.n_anchors} anchors)",
+            f"  Bond lengths (Å) : mean={self.bond_length_mean:.3f}  "
+            f"std={self.bond_length_std:.3f}  "
+            f"[{self.bond_length_min:.3f}, {self.bond_length_max:.3f}]",
+            f"  Bond angles  (°) : mean={self.bond_angle_mean:.2f}  "
+            f"std={self.bond_angle_std:.2f}  "
+            f"[{self.bond_angle_min:.2f}, {self.bond_angle_max:.2f}]",
+            f"  Dihedrals    (°) : mean={self.dihedral_mean:.2f}  "
+            f"std={self.dihedral_std:.2f}  "
+            f"[{self.dihedral_min:.2f}, {self.dihedral_max:.2f}]",
+        ]
+        return "\n".join(lines)
+
+
