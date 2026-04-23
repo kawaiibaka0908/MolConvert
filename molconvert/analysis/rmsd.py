@@ -426,3 +426,22 @@ def ic_summary(mol: MoleculeIC) -> ICSummary:
 #  Internal helpers                                                    #
 # ------------------------------------------------------------------ #
 
+def _filter_atoms(mol: MoleculeIC, atom_filter: Optional[list[str]]):
+    if atom_filter is None:
+        return mol.atoms
+    return [a for a in mol.atoms if a.atom_name in atom_filter]
+
+
+def _extract_coords(mol: MoleculeIC, atom_filter: Optional[list[str]]) -> np.ndarray:
+    atoms = _filter_atoms(mol, atom_filter)
+    positions = []
+    for a in atoms:
+        if a.position is None:
+            raise ValueError(
+                f"Atom {a.atom_serial} ({a.atom_name}) in {mol.name} "
+                "has no Cartesian position."
+            )
+        positions.append(a.position)
+    if not positions:
+        return np.zeros((0, 3), dtype=np.float64)
+    return np.array(positions, dtype=np.float64)
