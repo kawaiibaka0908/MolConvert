@@ -406,3 +406,75 @@ def test_per_atom_deviation_self_all_zero(mol_orig):
         assert rec["deviation"] == pytest.approx(0.0, abs=1e-10)
 
 
+def test_per_atom_deviation_roundtrip_bounded(mol_orig, mol_recon):
+    devs = per_atom_deviation(mol_orig, mol_recon)
+    for rec in devs:
+        assert rec["deviation"] < 1.0
+
+
+def test_per_atom_deviation_returns_correct_count(mol_orig, mol_recon):
+    devs = per_atom_deviation(mol_orig, mol_recon)
+    assert len(devs) == len(mol_orig.atoms)
+
+
+def test_per_atom_deviation_has_expected_keys(mol_orig, mol_recon):
+    rec = per_atom_deviation(mol_orig, mol_recon)[0]
+    for key in ("atom_serial", "atom_name", "residue_name", "residue_seq",
+                "chain_id", "deviation"):
+        assert key in rec
+
+
+def test_per_atom_deviation_with_filter(mol_orig, mol_recon):
+    devs = per_atom_deviation(mol_orig, mol_recon, atom_filter=["CA"])
+    assert len(devs) == 1
+    assert devs[0]["atom_name"] == "CA"
+
+
+def test_per_atom_deviation_count_mismatch_raises(mol_orig):
+    short = copy.deepcopy(mol_orig)
+    short.atoms = short.atoms[:3]
+    with pytest.raises(ValueError, match="Atom count mismatch"):
+        per_atom_deviation(mol_orig, short)
+
+
+# ------------------------------------------------------------------ #
+#  ic_summary                                                          #
+# ------------------------------------------------------------------ #
+
+def test_ic_summary_returns_icsummary(mol_orig):
+    assert isinstance(ic_summary(mol_orig), ICSummary)
+
+
+def test_ic_summary_atom_count(mol_orig):
+    assert ic_summary(mol_orig).n_atoms == 5
+
+
+def test_ic_summary_anchor_count(mol_orig):
+    assert ic_summary(mol_orig).n_anchors == 1
+
+
+def test_ic_summary_bond_length_range(mol_orig):
+    s = ic_summary(mol_orig)
+    assert s.bond_length_min <= s.bond_length_mean <= s.bond_length_max
+    assert s.bond_length_std >= 0.0
+
+
+def test_ic_summary_bond_angle_range(mol_orig):
+    s = ic_summary(mol_orig)
+    assert 0.0 <= s.bond_angle_min
+    assert s.bond_angle_max <= 180.0
+
+
+def test_ic_summary_str_contains_keywords(mol_orig):
+    text = str(ic_summary(mol_orig))
+    assert "Bond lengths" in text
+    assert "Bond angles" in text
+    assert "Dihedrals" in text
+
+
+def test_ic_summary_empty_molecule():
+    from molconvert.core.internal_coords import MoleculeIC
+    empty = MoleculeIC(name="e", source_fmt="pdb")
+    s = ic_summary(empty)
+    assert s.n_atoms == 0
+    assert s.n_anchors == 0
