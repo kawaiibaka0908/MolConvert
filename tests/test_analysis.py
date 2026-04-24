@@ -319,3 +319,90 @@ def test_kabsch_superpose_shape():
     assert aligned.shape == c2.shape
 
 
+def test_kabsch_superpose_rmsd_matches_kabsch_rmsd():
+    rng = np.random.default_rng(71)
+    c1 = rng.standard_normal((15, 3))
+    c2 = rng.standard_normal((15, 3))
+    aligned = kabsch_superpose(c1, c2)
+    r_direct = kabsch_rmsd(c1, c2)
+    r_manual = float(np.sqrt(np.mean(np.sum((c1 - aligned) ** 2, axis=1))))
+    assert r_direct == pytest.approx(r_manual, abs=1e-10)
+
+
+# ------------------------------------------------------------------ #
+#  rmsd (no superposition)                                             #
+# ------------------------------------------------------------------ #
+
+def test_rmsd_identical_arrays_is_zero():
+    coords = np.random.default_rng(0).standard_normal((10, 3))
+    assert rmsd(coords, coords) == pytest.approx(0.0)
+
+
+def test_rmsd_known_value():
+    c1 = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+    c2 = np.array([[1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+    assert rmsd(c1, c2) == pytest.approx(1.0)
+
+
+def test_rmsd_shape_mismatch_raises():
+    with pytest.raises(ValueError, match="Shape mismatch"):
+        rmsd(np.zeros((5, 3)), np.zeros((6, 3)))
+
+
+def test_rmsd_non_negative():
+    rng = np.random.default_rng(1)
+    for _ in range(20):
+        c1 = rng.standard_normal((8, 3))
+        c2 = rng.standard_normal((8, 3))
+        assert rmsd(c1, c2) >= 0.0
+
+
+# ------------------------------------------------------------------ #
+#  rmsd_molecules                                                      #
+# ------------------------------------------------------------------ #
+
+def test_rmsd_molecules_self_is_zero(mol_orig):
+    assert rmsd_molecules(mol_orig, mol_orig) == pytest.approx(0.0)
+
+
+def test_rmsd_molecules_roundtrip_realistic(mol_orig, mol_recon):
+    r = rmsd_molecules(mol_orig, mol_recon)
+    # Reconstruction rounds angles to 0.01° — expect small but non-zero RMSD
+    assert r < 0.5
+    assert r > 0.0
+
+
+def test_rmsd_molecules_with_filter_realistic(mol_orig, mol_recon):
+    r = rmsd_molecules(mol_orig, mol_recon, atom_filter=["N", "CA", "C"])
+    assert r < 0.5
+
+
+def test_rmsd_molecules_filter_no_matches_returns_zero(mol_orig):
+    r = rmsd_molecules(mol_orig, mol_orig, atom_filter=["ZZZ"])
+    assert r == pytest.approx(0.0)
+
+
+def test_rmsd_molecules_count_mismatch_raises(mol_orig):
+    short_mol = copy.deepcopy(mol_orig)
+    short_mol.atoms = short_mol.atoms[:3]
+    with pytest.raises(ValueError, match="Atom count mismatch"):
+        rmsd_molecules(mol_orig, short_mol)
+
+
+def test_rmsd_molecules_missing_position_raises(mol_orig):
+    bad = copy.deepcopy(mol_orig)
+    bad.atoms[0].cart_x = None
+    with pytest.raises(ValueError):
+        rmsd_molecules(bad, mol_orig)
+
+
+# ------------------------------------------------------------------ #
+#  per_atom_deviation                                                  #
+# ------------------------------------------------------------------ #
+
+def test_per_atom_deviation_self_all_zero(mol_orig):
+    devs = per_atom_deviation(mol_orig, mol_orig)
+    for rec in devs:
+        assert rec["deviation"] == pytest.approx(0.0, abs=1e-10)
+
+
