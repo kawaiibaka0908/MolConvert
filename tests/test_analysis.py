@@ -197,3 +197,125 @@ def test_kabsch_aligned_coords_match_reference():
 #  kabsch_align — Test 4: noise (RMSD small but non-zero)             #
 # ------------------------------------------------------------------ #
 
+def test_kabsch_noisy_structure_rmsd_small_nonzero():
+    rng = np.random.default_rng(20)
+    coords1 = rng.standard_normal((50, 3))
+    noise = rng.standard_normal((50, 3)) * 0.05   # 0.05 Å noise
+    coords2 = coords1 + noise
+    R, t, r = kabsch_align(coords1, coords2)
+    assert r > 0.0
+    assert r < 0.1   # well below naive RMSD, but non-zero
+
+
+def test_kabsch_noise_rmsd_less_than_naive():
+    rng = np.random.default_rng(21)
+    coords1 = rng.standard_normal((50, 3))
+    noise = rng.standard_normal((50, 3)) * 0.1
+    # Add a translation so naive RMSD is inflated
+    coords2 = coords1 + noise + np.array([5.0, 5.0, 5.0])
+    naive = rmsd(coords1, coords2)
+    _, _, r = kabsch_align(coords1, coords2)
+    assert r < naive
+
+
+# ------------------------------------------------------------------ #
+#  kabsch_align — Test 5: reflection correction                        #
+# ------------------------------------------------------------------ #
+
+def test_kabsch_reflection_det_is_plus_one():
+    """Rotation matrix from kabsch_align must always be a proper rotation."""
+    rng = np.random.default_rng(30)
+    # Construct a reflected (improper) version of coords1
+    coords1 = rng.standard_normal((20, 3))
+    # Invert x-axis — this is a reflection, not a rotation
+    coords2 = coords1 * np.array([-1, 1, 1])
+    R, t, r = kabsch_align(coords1, coords2)
+    assert np.linalg.det(R) == pytest.approx(1.0, abs=1e-10)
+
+
+def test_kabsch_reflection_no_negative_det():
+    rng = np.random.default_rng(31)
+    for seed in range(10):
+        coords1 = np.random.default_rng(seed).standard_normal((15, 3))
+        coords2 = coords1 * np.array([-1, 1, 1])   # reflection
+        R, _, _ = kabsch_align(coords1, coords2)
+        assert np.linalg.det(R) > 0, f"Negative determinant on seed {seed}"
+
+
+# ------------------------------------------------------------------ #
+#  kabsch_align — rotation matrix properties                           #
+# ------------------------------------------------------------------ #
+
+def test_kabsch_rotation_is_orthogonal():
+    rng = np.random.default_rng(40)
+    c1 = rng.standard_normal((20, 3))
+    c2 = rng.standard_normal((20, 3))
+    R, _, _ = kabsch_align(c1, c2)
+    assert np.allclose(R.T @ R, np.eye(3), atol=1e-12)
+    assert np.allclose(R @ R.T, np.eye(3), atol=1e-12)
+
+
+def test_kabsch_determinant_is_one():
+    rng = np.random.default_rng(41)
+    c1 = rng.standard_normal((20, 3))
+    c2 = rng.standard_normal((20, 3))
+    R, _, _ = kabsch_align(c1, c2)
+    assert np.linalg.det(R) == pytest.approx(1.0, abs=1e-10)
+
+
+def test_kabsch_rmsd_symmetric():
+    """RMSD(A, B) should equal RMSD(B, A)."""
+    rng = np.random.default_rng(50)
+    c1 = rng.standard_normal((20, 3))
+    c2 = rng.standard_normal((20, 3))
+    _, _, r12 = kabsch_align(c1, c2)
+    _, _, r21 = kabsch_align(c2, c1)
+    assert r12 == pytest.approx(r21, abs=1e-10)
+
+
+def test_kabsch_rmsd_non_negative():
+    rng = np.random.default_rng(51)
+    for _ in range(20):
+        c1 = rng.standard_normal((10, 3))
+        c2 = rng.standard_normal((10, 3))
+        _, _, r = kabsch_align(c1, c2)
+        assert r >= 0.0
+
+
+# ------------------------------------------------------------------ #
+#  kabsch_align — debug flag (smoke test, no crash)                   #
+# ------------------------------------------------------------------ #
+
+def test_kabsch_debug_mode_runs_without_error(capsys):
+    rng = np.random.default_rng(60)
+    c1 = rng.standard_normal((10, 3))
+    c2 = rng.standard_normal((10, 3))
+    kabsch_align(c1, c2, debug=True)
+    out = capsys.readouterr().out
+    assert "centroid" in out
+    assert "RMSD before" in out
+    assert "RMSD after" in out
+    assert "det(R)" in out
+
+
+def test_kabsch_debug_reflection_fix_printed(capsys):
+    rng = np.random.default_rng(61)
+    coords1 = rng.standard_normal((20, 3))
+    coords2 = coords1 * np.array([-1, 1, 1])   # force reflection case
+    kabsch_align(coords1, coords2, debug=True)
+    out = capsys.readouterr().out
+    assert "reflection fix" in out
+
+
+# ------------------------------------------------------------------ #
+#  kabsch_superpose and kabsch_rmsd convenience wrappers               #
+# ------------------------------------------------------------------ #
+
+def test_kabsch_superpose_shape():
+    rng = np.random.default_rng(70)
+    c1 = rng.standard_normal((15, 3))
+    c2 = rng.standard_normal((15, 3))
+    aligned = kabsch_superpose(c1, c2)
+    assert aligned.shape == c2.shape
+
+
