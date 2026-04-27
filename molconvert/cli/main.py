@@ -316,3 +316,6 @@ def _load_single(path: str, model_id: int, chain: str | None):
     return molecules[0]
 
 
+def _die(message: str) -> None:
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
