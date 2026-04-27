@@ -290,3 +290,29 @@ def run_rmsd(argv: list[str] | None = None) -> None:
 #  Shared helpers                                                      #
 # ------------------------------------------------------------------ #
 
+def _load_single(path: str, model_id: int, chain: str | None):
+    """Parse a PDB and return the first (or chain-filtered) MoleculeIC."""
+    try:
+        molecules = parse_pdb(path, model_id=model_id)
+    except Exception as exc:
+        _die(f"Failed to parse '{path}': {exc}")
+
+    if not molecules:
+        _die(f"No ATOM records found in '{path}'.")
+
+    if chain:
+        molecules = [m for m in molecules if m.name.endswith(f"_{chain}")]
+        if not molecules:
+            _die(f"Chain '{chain}' not found in '{path}'.")
+
+    if len(molecules) > 1 and not chain:
+        chains = ", ".join(m.name.split("_")[-1] for m in molecules)
+        print(
+            f"[info] '{path}' has multiple chains ({chains}); "
+            "using the first. Use --chain to select one.",
+            file=sys.stderr,
+        )
+
+    return molecules[0]
+
+
