@@ -190,3 +190,103 @@ def run_convert(argv: list[str] | None = None) -> None:
 #  rmsd                                                                #
 # ------------------------------------------------------------------ #
 
+def run_rmsd(argv: list[str] | None = None) -> None:
+    """Entry point: rmsd <file1.pdb> <file2.pdb | --self> [options]"""
+    parser = argparse.ArgumentParser(
+        prog="rmsd",
+        description="Compute RMSD between two PDB files.\n"
+                    "Use --self for a round-trip reconstruction test on a "
+                    "single file.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("file1", metavar="FILE1.pdb",
+                        help="First PDB file (or the only file with --self).")
+    parser.add_argument("file2", metavar="FILE2.pdb", nargs="?", default=None,
+                        help="Second PDB file. Omit when using --self.")
+    parser.add_argument("--self", dest="self_test", action="store_true",
+                        help="Round-trip test: parse FILE1, reconstruct from IC, "
+                             "compare reconstructed vs original.")
+    parser.add_argument("--filter", metavar="NAMES", default=None,
+                        help="Comma-separated atom names to include "
+                             "(e.g. 'CA' or 'N,CA,C'). Default: all atoms.")
+    parser.add_argument("--per-atom", action="store_true",
+                        help="Print per-atom deviation table.")
+    parser.add_argument("--no-superpose", action="store_true",
+                        help="Skip Kabsch superposition; compare coordinates as-is. "
+                             "Useful when structures share the same reference frame "
+                             "(e.g. round-trip --self tests).")
+    parser.add_argument("--model", type=int, default=0, metavar="N",
+                        help="MODEL record index (default: 0).")
+    parser.add_argument("--chain", metavar="ID", default=None,
+                        help="Restrict to a single chain (e.g. A).")
+
+    args = parser.parse_args(argv)
+
+    # --- Validate argument combinations ---
+    if args.self_test and args.file2:
+        _die("Provide either --self or FILE2, not both.")
+    if not args.self_test and args.file2 is None:
+        _die("Provide FILE2.pdb, or use --self for a round-trip test.")
+
+    atom_filter = (
+        [n.strip() for n in args.filter.split(",")]
+        if args.filter else None
+    )
+
+    # --- Load molecule(s) ---
+    mol1 = _load_single(args.file1, args.model, args.chain)
+
+    if args.self_test:
+        # Round-trip: reconstruct from IC, compare to original
+        try:
+            mol2 = reconstruct(mol1)
+        except Exception as exc:
+            _die(f"Reconstruction failed: {exc}")
+        label1 = f"{args.file1} (original)"
+        label2 = f"{args.file1} (reconstructed)"
+    else:
+        mol2 = _load_single(args.file2, args.model, args.chain)
+        label1 = args.file1
+        label2 = args.file2
+
+    superpose = not args.no_superpose
+
+    # --- Compute RMSD ---
+    try:
+        r = rmsd_molecules(mol1, mol2, atom_filter=atom_filter, superpose=superpose)
+    except ValueError as exc:
+        _die(str(exc))
+
+    filter_label = f" [{args.filter}]" if args.filter else ""
+    method_label = "" if superpose else " (no superposition)"
+    print(f"RMSD{filter_label}{method_label}: {r:.4f} Å")
+    print(f"  {label1}")
+    print(f"  {label2}")
+
+    # --- Per-atom table ---
+    if args.per_atom:
+        try:
+            deviations = per_atom_deviation(mol1, mol2, atom_filter=atom_filter, superpose=superpose)
+        except ValueError as exc:
+            _die(str(exc))
+
+        print()
+        print(f"{'Chain':>5}  {'Res':>4}  {'ResSeq':>6}  {'Atom':>4}  {'Dev (Å)':>8}")
+        print("-" * 36)
+        for rec in deviations:
+            print(
+                f"{rec['chain_id']:>5}  "
+                f"{rec['residue_name']:>4}  "
+                f"{rec['residue_seq']:>6}  "
+                f"{rec['atom_name']:>4}  "
+                f"{rec['deviation']:>8.4f}"
+            )
+        print("-" * 36)
+        max_dev = max(r["deviation"] for r in deviations)
+        print(f"Max deviation: {max_dev:.4f} Å")
+
+
+# ------------------------------------------------------------------ #
+#  Shared helpers                                                      #
+# ------------------------------------------------------------------ #
+
