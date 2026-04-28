@@ -80,3 +80,40 @@ def test_convert_pdb_ends_with_end(capsys):
     assert "END" in out
 
 
+def test_convert_pdb_to_file(tmp_path, capsys):
+    out_path = str(tmp_path / "out.pdb")
+    run_convert([MINI_PDB, "-f", "pdb", "-o", out_path])
+    content = Path(out_path).read_text()
+    assert "ATOM" in content
+
+
+# ------------------------------------------------------------------ #
+#  convert — chain filter                                              #
+# ------------------------------------------------------------------ #
+
+def test_convert_chain_a(capsys):
+    run_convert([MINI_PDB, "--chain", "A"])
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    assert data["name"].endswith("_A")
+
+
+def test_convert_invalid_chain_exits():
+    with pytest.raises(SystemExit):
+        run_convert([MINI_PDB, "--chain", "Z"])
+
+
+# ------------------------------------------------------------------ #
+#  convert — summary flag                                              #
+# ------------------------------------------------------------------ #
+
+def test_convert_summary_writes_to_stderr(capsys):
+    run_convert([MINI_PDB, "--summary"])
+    _, err = capsys.readouterr()
+    assert "Bond lengths" in err
+
+
+# ------------------------------------------------------------------ #
+#  convert — error paths                                               #
+# ------------------------------------------------------------------ #
+
