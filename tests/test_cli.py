@@ -45,3 +45,38 @@ def test_convert_json_has_ic_fields(capsys):
     assert atom3["dihedral"]    is not None
 
 
+def test_convert_json_first_atom_is_anchor(capsys):
+    run_convert([MINI_PDB])
+    out, _ = capsys.readouterr()
+    data = json.loads(out)
+    atom0 = data["atoms"][0]
+    assert atom0["bond_length"] is None
+    assert atom0["bond_angle"]  is None
+    assert atom0["dihedral"]    is None
+
+
+def test_convert_json_to_file(tmp_path, capsys):
+    out_path = str(tmp_path / "out.json")
+    run_convert([MINI_PDB, "-o", out_path])
+    content = Path(out_path).read_text()
+    data = json.loads(content)
+    assert len(data["atoms"]) == 5
+
+
+# ------------------------------------------------------------------ #
+#  convert — pdb output                                                #
+# ------------------------------------------------------------------ #
+
+def test_convert_pdb_stdout(capsys):
+    run_convert([MINI_PDB, "-f", "pdb"])
+    out, _ = capsys.readouterr()
+    atom_lines = [l for l in out.splitlines() if l.startswith("ATOM")]
+    assert len(atom_lines) == 5
+
+
+def test_convert_pdb_ends_with_end(capsys):
+    run_convert([MINI_PDB, "-f", "pdb"])
+    out, _ = capsys.readouterr()
+    assert "END" in out
+
+
