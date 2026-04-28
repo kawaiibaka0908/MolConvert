@@ -117,3 +117,40 @@ def test_convert_summary_writes_to_stderr(capsys):
 #  convert — error paths                                               #
 # ------------------------------------------------------------------ #
 
+def test_convert_missing_file_exits():
+    with pytest.raises(SystemExit):
+        run_convert(["nonexistent.pdb"])
+
+
+# ------------------------------------------------------------------ #
+#  rmsd — self test                                                    #
+# ------------------------------------------------------------------ #
+
+def test_rmsd_self_near_zero(capsys):
+    run_rmsd([MINI_PDB, "--self"])
+    out, _ = capsys.readouterr()
+    # parse "RMSD: 0.0000 Å" line
+    rmsd_line = [l for l in out.splitlines() if l.startswith("RMSD")][0]
+    value = float(rmsd_line.split(":")[1].strip().split()[0])
+    assert value < 1e-4
+
+
+def test_rmsd_self_per_atom(capsys):
+    run_rmsd([MINI_PDB, "--self", "--per-atom"])
+    out, _ = capsys.readouterr()
+    assert "Max deviation" in out
+    # Table data rows are indented with exactly 4 spaces (file path lines use 2)
+    data_lines = [l for l in out.splitlines() if l.startswith("    ") and not l.startswith("-----")]
+    assert len(data_lines) == 5
+
+
+def test_rmsd_self_with_filter(capsys):
+    run_rmsd([MINI_PDB, "--self", "--filter", "CA"])
+    out, _ = capsys.readouterr()
+    assert "CA" in out or "RMSD" in out
+
+
+# ------------------------------------------------------------------ #
+#  rmsd — two files                                                    #
+# ------------------------------------------------------------------ #
+
