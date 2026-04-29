@@ -142,3 +142,147 @@ CLI COMMANDS
     convert input.pdb --to zmat
     convert input.pdb --to zmat -o output.zmat
 
+    What it does:
+        Reads the PDB, converts to internal coordinates (JSON IR internally),
+        then exports as a Z-matrix file.
+        ZMAT is the external representation of internal coordinates.
+        Anchor atom Cartesian positions are stored in the file header so
+        the ZMAT is self-contained for a full round-trip back to PDB.
+
+    Example output (output.zmat):
+        ZMAT input_A
+        # source_fmt pdb
+        # n_atoms 304
+        # anchor 1    -8.901000     4.127000    -0.555000
+        # anchor 2    -8.608000     3.135000    -1.618000
+        # anchor 3    -7.117000     2.964000    -1.897000
+           1  N     ASN  A     1
+           2  CA    ASN  A     1     1    1.483200
+           3  C     ASN  A     1     2    1.526487     1   113.507460
+           4  O     ASN  A     1     3    1.223043     2   117.845536     1  -121.197001
+           ...
+        END
+
+    ZMAT column layout (atom 4 onwards):
+        <idx>  <name>  <resname>  <chain>  <resseq>
+               <bond_to>  <bond_length>
+               <angle_to>  <bond_angle>
+               <dihedral_to>  <dihedral>
+
+
+3. CONVERT — ZMAT to PDB                                       *** NEW ***
+--------------------------------------------------------------------------
+    convert molecule.zmat --to pdb
+    convert molecule.zmat --to pdb -o rebuilt.pdb
+
+    What it does:
+        Reads a ZMAT file, converts it to MoleculeIC (JSON IR internally),
+        then uses the NeRF algorithm to reconstruct all atom Cartesian
+        positions and writes a PDB file.
+        Round-trip accuracy: RMSD < 0.00001 A vs the original PDB.
+
+
+4. CONVERT — ZMAT to internal JSON                             *** NEW ***
+--------------------------------------------------------------------------
+    convert molecule.zmat --to internal
+    convert molecule.zmat --to json
+
+    What it does:
+        Reads a ZMAT file and outputs the MoleculeIC as JSON (the internal
+        IR). Useful for inspecting or editing internal coordinates before
+        further conversion. "internal" and "json" are equivalent.
+
+
+5. CONVERT — PDB to reconstructed PDB
+--------------------------------------
+    convert input.pdb --to pdb
+
+    What it does:
+        Reads the PDB, converts it to internal coordinates, then uses the
+        NeRF algorithm to rebuild all atom positions from scratch.
+        The output is a new PDB file reconstructed purely from IC values.
+
+
+6. CONVERT — save output to a file
+------------------------------------
+    convert input.pdb -o output.json
+    convert input.pdb --to pdb -o rebuilt.pdb
+    convert input.pdb --to zmat -o output.zmat
+    convert molecule.zmat --to pdb -o rebuilt.pdb
+
+    What it does:
+        Instead of printing to the screen, writes the result to a file.
+
+
+7. CONVERT — single chain only
+--------------------------------
+    convert input.pdb --chain A
+
+    What it does:
+        If the PDB has multiple chains (A, B, C...), only processes chain A.
+        (PDB input only; ignored for .zmat input)
+
+
+8. CONVERT — include ligands (HETATM records)
+----------------------------------------------
+    convert input.pdb --include-hetatm
+
+    What it does:
+        Also processes ligand/small molecule records in the PDB (HETATM lines),
+        not just the protein backbone (ATOM lines).
+        (PDB input only)
+
+
+9. CONVERT — show IC statistics
+---------------------------------
+    convert input.pdb --summary
+    convert molecule.zmat --to pdb --summary
+
+    What it does:
+        After conversion, prints a summary of the IC values to the screen:
+            Bond lengths (A) : mean=1.612  std=0.373  [1.235, 2.231]
+            Bond angles  (°) : mean=88.13  std=39.71  [32.25, 120.93]
+            Dihedrals    (°) : mean=90.00  std=90.00  [0.00, 180.00]
+
+
+RMSD — Kabsch superposition (default behaviour)
+------------------------------------------------
+    The rmsd command uses the Kabsch algorithm by default.
+    This finds the optimal translation and rotation that minimises the RMSD
+    between the two structures before computing it, so results are independent
+    of how the structures are oriented or positioned in space.
+    This is the same method used by PyMOL, VMD, and standard bioinformatics tools.
+
+    To skip superposition and compare raw coordinates as-is, add --no-superpose:
+        rmsd structure1.pdb structure2.pdb --no-superpose
+
+
+10. RMSD — round-trip accuracy test (one file)
+----------------------------------------------
+    rmsd input.pdb --self
+    rmsd input.pdb --self --no-superpose
+
+    What it does:
+        Parses the PDB, reconstructs it from IC, then measures the Kabsch RMSD
+        between original and reconstructed.  For a perfect round-trip both
+        give 0.0000 A; --no-superpose skips alignment (useful to verify the
+        structures share the same reference frame).
+
+    Example output:
+        RMSD: 0.0000 Å
+          input.pdb (original)
+          input.pdb (reconstructed)
+
+
+11. RMSD — compare two PDB files
+---------------------------------
+    rmsd structure1.pdb structure2.pdb
+
+    What it does:
+        Superposes structure1 onto structure2 using the Kabsch algorithm, then
+        reports the RMSD.  Removes the effect of global translation and rotation
+        so you measure actual structural difference, not coordinate-frame offset.
+
+
+12. RMSD — filter by atom name (e.g. CA only)
+---------------------------------------------
