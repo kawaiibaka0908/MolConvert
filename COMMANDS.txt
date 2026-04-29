@@ -1,0 +1,144 @@
+molconvert — Command Reference
+==============================
+
+SETUP
+-----
+Requirements:
+    - Python 3.9 or newer  (check with: python --version)
+    - pip (comes with Python)
+
+Install the package (run once, from inside the molconvert/ folder):
+    cd molconvert
+    pip install -e .
+
+This automatically installs all dependencies:
+    numpy, biopython, rdkit
+
+After install, two commands become available everywhere in the terminal:
+    convert     — format conversion
+    rmsd        — structural comparison
+
+To verify the install worked:
+    convert --help
+    rmsd --help
+
+
+==============================
+ARCHITECTURE
+==============================
+
+JSON is always the internal intermediate representation (IR).
+ZMAT is the external representation for internal coordinates.
+
+    Input formats          Core IR (JSON)          Output formats
+    ─────────────          ──────────────          ──────────────
+    PDB  ────────►  ┌──────────────────────┐  ────►  PDB
+    SDF  ────────►  │   MoleculeIC         │  ────►  SDF
+    ZMAT ────────►  │  (in-memory / JSON)  │  ────►  ZMAT
+                    └──────────────────────┘  ────►  JSON (internal)
+
+Input format is auto-detected from file extension (.pdb, .sdf, or .zmat).
+
+Bond connectivity in SDF output is inferred from interatomic distances
+using standard covalent radii (30 % tolerance). All bonds are written as
+single (type 1) — bond-order information is not preserved in the IC
+representation.
+
+
+==============================
+CLI COMMANDS
+==============================
+
+1. CONVERT — PDB to JSON (internal coordinates)
+------------------------------------------------
+    convert input.pdb
+    convert input.pdb --to json
+
+    What it does:
+        Reads the PDB file and outputs internal coordinates (bond lengths,
+        bond angles, dihedrals) for every atom as a JSON file.
+        The first 3 atoms are "anchors" — they have no IC, just XYZ positions.
+        Atom 4 onwards has full IC: bond_length + bond_angle + dihedral.
+        Each atom also carries bond_to / angle_to / dihedral_to reference
+        indices (1-based positions) used by the ZMAT converter.
+
+    Example output:
+        {
+          "name": "mini_A",
+          "atoms": [
+            { "atom_name": "N",  "bond_length": null,  "bond_angle": null,  "dihedral": null,
+              "bond_to": null,  "angle_to": null,  "dihedral_to": null  },
+            { "atom_name": "CA", "bond_length": 1.458, "bond_angle": null,  "dihedral": null,
+              "bond_to": 1,     "angle_to": null,  "dihedral_to": null  },
+            { "atom_name": "C",  "bond_length": 1.523, "bond_angle": 111.2, "dihedral": null,
+              "bond_to": 2,     "angle_to": 1,     "dihedral_to": null  },
+            { "atom_name": "O",  "bond_length": 1.235, "bond_angle": 120.9, "dihedral": 0.0,
+              "bond_to": 3,     "angle_to": 2,     "dihedral_to": 1     },
+            ...
+          ]
+        }
+
+
+2. CONVERT — PDB to SDF                                        *** NEW ***
+--------------------------------------------------------------------------
+    convert input.pdb --to sdf
+    convert input.pdb --to sdf -o output.sdf
+
+    What it does:
+        Reads the PDB file, converts to internal coordinates, then writes
+        an SDF V2000 file. Bond connectivity is inferred automatically from
+        interatomic distances. All bond orders are written as 1 (single).
+
+    Example output (output.sdf):
+        input_A
+             molconvert          3D
+
+        304310  0  0  0  0  0  0  0  0999 V2000
+           -8.9010    4.1270   -0.5550 N   0  0  0  0  0  0  0  0  0  0  0  0
+           -8.6080    3.1350   -1.6180 C   0  0  0  0  0  0  0  0  0  0  0  0
+           ...
+          1  2  1  0
+          2  3  1  0
+          ...
+        M  END
+        $$$$
+
+
+3. CONVERT — SDF to PDB                                        *** NEW ***
+--------------------------------------------------------------------------
+    convert molecule.sdf --to pdb
+    convert molecule.sdf --to pdb -o output.pdb
+
+    What it does:
+        Reads all molecule records from an SDF file, converts each to
+        internal coordinates, reconstructs Cartesian positions via NeRF,
+        and writes a PDB file. Multiple molecules are wrapped in
+        MODEL / ENDMDL records.
+
+
+4. CONVERT — SDF to SDF (round-trip / re-export)               *** NEW ***
+---------------------------------------------------------------------------
+    convert molecule.sdf --to sdf
+    convert molecule.sdf --to sdf -o output.sdf
+
+    What it does:
+        Reads an SDF, passes each molecule through the IC pipeline, and
+        re-exports as SDF. Bond counts are preserved. Useful for
+        normalising coordinates or stripping hydrogens (--remove-hydrogens).
+
+
+5. CONVERT — SDF with hydrogens stripped                       *** NEW ***
+---------------------------------------------------------------------------
+    convert molecule.sdf --to pdb --remove-hydrogens
+    convert molecule.sdf --to sdf --remove-hydrogens
+
+    What it does:
+        Strips hydrogen atoms during SDF parsing before any conversion.
+        Affects all output formats when input is .sdf.
+
+
+6. CONVERT — PDB to ZMAT (Z-matrix)                            *** NEW ***
+---------------------------------------------------------------------------
+    convert input.pdb --to zmat
+    convert input.pdb --to zmat -o output.zmat
+
