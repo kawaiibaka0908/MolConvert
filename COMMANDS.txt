@@ -286,3 +286,147 @@ RMSD — Kabsch superposition (default behaviour)
 
 12. RMSD — filter by atom name (e.g. CA only)
 ---------------------------------------------
+    rmsd structure1.pdb structure2.pdb --filter CA
+    rmsd input.pdb --self --filter N,CA,C
+
+    What it does:
+        Only compares specific atoms. Common filters:
+            CA        → alpha-carbon only (backbone trace)
+            N,CA,C    → backbone heavy atoms only
+        Kabsch superposition uses only the filtered atoms.
+
+
+13. RMSD — per-atom deviation table
+-------------------------------------
+    rmsd input.pdb --self --per-atom
+
+    What it does:
+        Shows how much each individual atom deviated after Kabsch superposition.
+
+    Example output:
+        RMSD: 0.0000 Å
+          input.pdb (original)
+          input.pdb (reconstructed)
+
+        Chain   Res  ResSeq  Atom   Dev (Å)
+        ------------------------------------
+            A   ALA       1     N    0.0000
+            A   ALA       1    CA    0.0000
+            A   ALA       1     C    0.0000
+        ------------------------------------
+        Max deviation: 0.0000 Å
+
+
+14. RMSD — disable superposition
+----------------------------------
+    rmsd structure1.pdb structure2.pdb --no-superpose
+
+    What it does:
+        Compares coordinates exactly as stored in the files, with no translation
+        or rotation applied.  Use this only when both structures are already in
+        the same reference frame (e.g. snapshots from the same simulation).
+
+
+==============================
+CONVERT — QUICK REFERENCE
+==============================
+
+    Input        --to        Description
+    ─────────────────────────────────────────────────────────────────────
+    .pdb         json        PDB → internal coordinates (JSON)    [default]
+    .pdb         pdb         PDB → reconstructed PDB (via IC)
+    .pdb         sdf         PDB → SDF (bonds inferred)           [NEW]
+    .pdb         zmat        PDB → Z-matrix
+    .pdb         internal    alias for json
+    .sdf         pdb         SDF → PDB                            [NEW]
+    .sdf         sdf         SDF → SDF (round-trip / re-export)   [NEW]
+    .sdf         json        SDF → internal coordinates (JSON)    [NEW]
+    .sdf         zmat        SDF → Z-matrix                       [NEW]
+    .sdf         internal    alias for json                        [NEW]
+    .zmat        pdb         ZMAT → reconstructed PDB
+    .zmat        sdf         ZMAT → SDF (bonds inferred)          [NEW]
+    .zmat        json        ZMAT → internal coordinates (JSON)
+    .zmat        internal    alias for json
+
+    SDF-only flags:
+        --remove-hydrogens    strip H atoms during SDF parsing    [NEW]
+
+
+==============================
+PYTHON API (use in your code)
+==============================
+
+    from molconvert.parsers.pdb_parser import parse_pdb
+    from molconvert.parsers.sdf_parser import parse_sdf
+    from molconvert.builders.reconstruct import reconstruct, to_pdb, save_pdb
+    from molconvert.builders.to_sdf import molecule_to_sdf, save_sdf, molecules_to_sdf, save_sdf_multi
+    from molconvert.converters.json_to_zmat import molecule_to_zmat, save_zmat
+    from molconvert.converters.zmat_to_json import zmat_to_molecule, load_zmat
+    from molconvert.analysis import (
+        kabsch_superpose, kabsch_rmsd,
+        rmsd_molecules, per_atom_deviation, ic_summary,
+    )
+
+    # Parse a PDB file
+    molecules = parse_pdb("input.pdb")
+    mol = molecules[0]
+
+    # Parse an SDF file (can contain many molecules)
+    mols = parse_sdf("compounds.sdf")
+    mols = parse_sdf("compounds.sdf", remove_hydrogens=True)   # heavy atoms only
+
+    # Reconstruct Cartesian coords from IC
+    mol_rebuilt = reconstruct(mol)
+
+    # Export as PDB
+    pdb_text = to_pdb(mol_rebuilt)
+    save_pdb(mol_rebuilt, "rebuilt.pdb")
+
+    # Export as SDF (bonds inferred from distances)
+    sdf_text = molecule_to_sdf(mol)              # single molecule → string
+    save_sdf(mol, "output.sdf")                  # single molecule → file
+    sdf_text = molecules_to_sdf(mols)            # multiple molecules → string
+    save_sdf_multi(mols, "output_multi.sdf")     # multiple molecules → file
+
+    # Export internal coordinates as ZMAT
+    zmat_text = molecule_to_zmat(mol)          # returns string
+    save_zmat(mol, "output.zmat")              # writes file
+
+    # Load a ZMAT file back into the internal IR
+    mol = load_zmat("output.zmat")             # returns MoleculeIC
+    mol = zmat_to_molecule(zmat_text)          # parse from string
+
+    # Save IC as JSON
+    mol.save_json("molecule_ic.json")
+
+    # Compare two molecules (Kabsch superposition applied by default)
+    r = rmsd_molecules(mol, mol_rebuilt)                          # all atoms, Kabsch
+    r = rmsd_molecules(mol, mol_rebuilt, atom_filter=["CA"])      # CA only, Kabsch
+    r = rmsd_molecules(mol, mol_rebuilt, superpose=False)         # raw coords, no alignment
+
+    # Kabsch alignment and RMSD directly on coordinate arrays
+    coords_aligned = kabsch_superpose(coords1, coords2)           # returns aligned coords1
+    r = kabsch_rmsd(coords1, coords2)                             # RMSD after Kabsch
+
+    # Per-atom breakdown (Kabsch superposition applied before deviations)
+    deviations = per_atom_deviation(mol, mol_rebuilt)
+    deviations = per_atom_deviation(mol, mol_rebuilt, superpose=False)  # raw coords
+
+    # IC statistics
+    summary = ic_summary(mol)
+    print(summary)
+
+
+==============================
+RUN THE TESTS
+==============================
+
+    pytest tests/ -v
+
+    214 tests covering:
+        - geometry math  (bond length, angle, dihedral, NeRF)
+        - PDB parser
+        - SDF parser
+        - reconstruction builder
+        - RMSD analysis
+        - CLI commands
