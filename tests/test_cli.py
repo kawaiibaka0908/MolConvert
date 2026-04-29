@@ -154,3 +154,28 @@ def test_rmsd_self_with_filter(capsys):
 #  rmsd — two files                                                    #
 # ------------------------------------------------------------------ #
 
+def test_rmsd_two_identical_files(capsys):
+    run_rmsd([MINI_PDB, MINI_PDB])
+    out, _ = capsys.readouterr()
+    rmsd_line = [l for l in out.splitlines() if l.startswith("RMSD")][0]
+    value = float(rmsd_line.split(":")[1].strip().split()[0])
+    assert value == pytest.approx(0.0)
+
+
+# ------------------------------------------------------------------ #
+#  rmsd — error paths                                                  #
+# ------------------------------------------------------------------ #
+
+def test_rmsd_no_file2_no_self_exits():
+    with pytest.raises(SystemExit):
+        run_rmsd([MINI_PDB])
+
+
+def test_rmsd_self_and_file2_exits():
+    with pytest.raises(SystemExit):
+        run_rmsd([MINI_PDB, MINI_PDB, "--self"])
+
+
+def test_rmsd_missing_file_exits():
+    with pytest.raises(SystemExit):
+        run_rmsd(["ghost.pdb", "--self"])
