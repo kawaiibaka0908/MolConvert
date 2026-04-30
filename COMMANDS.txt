@@ -430,3 +430,147 @@ RUN THE TESTS
         - reconstruction builder
         - RMSD analysis
         - CLI commands
+        - ZMAT converter (json_to_zmat, zmat_to_json)
+        - ZMAT CLI paths (PDB→ZMAT, ZMAT→PDB, ZMAT→JSON)
+        - ZMAT round-trip accuracy
+        - SDF builder (to_sdf, bond inference)              [NEW]
+        - SDF↔PDB, SDF↔SDF, SDF↔ZMAT CLI paths            [NEW]
+        - PDB→SDF, ZMAT→SDF CLI paths                      [NEW]
+        - --remove-hydrogens flag                           [NEW]
+
+
+==============================
+HOW IT WORKS INTERNALLY
+==============================
+
+This section traces the complete call chain for every major operation —
+from the moment a command is typed to the final byte written to disk.
+
+──────────────────────────────
+1. ENTRY POINT — the CLI layer
+──────────────────────────────
+
+File: molconvert/cli/main.py
+
+When you run:
+    convert input.pdb --to zmat
+
+Python's setuptools wires the shell command "convert" to the function
+run_convert() via the entry_points in setup.py:
+    "convert=molconvert.cli.main:run_convert"
+
+run_convert() does four things in order:
+  a) Parses the command-line arguments with argparse.
+  b) Detects the input format from the file extension.
+  c) Loads the molecule(s) into the internal representation.
+  d) Converts and writes the output.
+
+
+──────────────────────────────────────────────────
+2. READING A PDB FILE — parse_pdb()
+──────────────────────────────────────────────────
+
+File: molconvert/parsers/pdb_parser.py
+Caller: run_convert() → parse_pdb(args.input)
+
+Call chain:
+  parse_pdb(path, model_id, include_hetatm)
+    └─ BioPython PDBParser().get_structure(path)
+         Returns a Structure object with chains of Residues of Atoms.
+    └─ _build_molecule_ic(chain_id, atoms_list)
+         Receives a flat list of Atom objects.
+         For every atom i (0-based index):
+
+           Position 0 (first atom):
+             bond_length = None   (no predecessor)
+             bond_angle  = None
+             dihedral    = None
+             bond_to     = None, angle_to = None, dihedral_to = None
+
+           Position 1 (second atom):
+             bond_length = bond_length(pos[0], pos[1])   ← geometry.py
+             bond_angle  = None
+             dihedral    = None
+             bond_to = 1, angle_to = None, dihedral_to = None
+
+           Position 2 (third atom):
+             bond_length = bond_length(pos[1], pos[2])
+             bond_angle  = bond_angle_deg(pos[0], pos[1], pos[2])
+             dihedral    = None
+             bond_to = 2, angle_to = 1, dihedral_to = None
+
+           Position i ≥ 3:
+             bond_length = bond_length(pos[i-1], pos[i])
+             bond_angle  = bond_angle_deg(pos[i-2], pos[i-1], pos[i])
+             dihedral    = dihedral_deg(pos[i-3], pos[i-2], pos[i-1], pos[i])
+             bond_to = i, angle_to = i-1, dihedral_to = i-2   (all 1-based)
+
+         Returns one MoleculeIC object per chain.
+
+
+──────────────────────────────────────────────────
+3. THE IC MATH — geometry functions
+──────────────────────────────────────────────────
+
+File: molconvert/core/geometry.py
+
+bond_length(a, b):
+    d = b - a                         # 3D vector
+    return sqrt(d·d)                  # Euclidean norm
+
+bond_angle_deg(a, b, c):
+    u = a - b                         # vector from b toward a
+    v = c - b                         # vector from b toward c
+    cos_θ = (u·v) / (|u| × |v|)
+    return degrees(arccos(clamp(cos_θ, -1, 1)))
+
+dihedral_deg(a, b, c, d):
+    b1 = b - a
+    b2 = c - b                        # central bond
+    b3 = d - c
+    n1 = b1 × b2                      # normal to first plane
+    n2 = b2 × b3                      # normal to second plane
+    m  = n1 × (b2 / |b2|)            # in-plane perpendicular
+    x  = n1·n2
+    y  = m·n2
+    return degrees(atan2(y, x))       # signed angle in [-180, 180]
+
+
+──────────────────────────────────────────────────
+4. READING AN SDF FILE — parse_sdf()
+──────────────────────────────────────────────────
+
+File: molconvert/parsers/sdf_parser.py
+Caller: run_convert() → parse_sdf(args.input, remove_hydrogens)
+
+Call chain:
+  parse_sdf(path, remove_hydrogens)
+    └─ RDKit SDMolSupplier(path, removeHs=remove_hydrogens)
+         Returns an iterator of RDKit Mol objects.
+    └─ For each RDKit Mol:
+         mol.GetConformer(0).GetAtomPosition(i) → (x, y, z) for every atom
+         Same IC computation as PDB parser (bond_length, bond_angle_deg,
+         dihedral_deg) using raw XYZ positions.
+         Element symbol read from atom.GetSymbol().
+         Returns MoleculeIC with source_fmt="sdf".
+
+
+──────────────────────────────────────────────────
+5. READING A ZMAT FILE — load_zmat() / zmat_to_molecule()
+──────────────────────────────────────────────────
+
+File: molconvert/converters/zmat_to_json.py
+Caller: run_convert() → load_zmat(args.input)
+
+Call chain:
+  load_zmat(path)
+    └─ reads file text → zmat_to_molecule(text)
+
+  zmat_to_molecule(text):
+    Parses line by line:
+
+    "ZMAT <name>"          → MoleculeIC.name
+    "# source_fmt <fmt>"   → MoleculeIC.source_fmt
+    "# n_atoms <n>"        → expected atom count (sanity check)
+    "# anchor <i> x y z"  → anchors dict: {i: (x, y, z)}
+    "END"                  → stop parsing
