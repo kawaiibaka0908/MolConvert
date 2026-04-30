@@ -718,3 +718,147 @@ Call chain:
             threshold² = (radii[i] + radii[j])² × 1.3²
             if dist² < threshold²:
                 append (i+1, j+1, 1)   ← 1-based atom indices, bond type 1
+        Returns list of (a1, a2, bond_type) tuples.
+
+    Covalent radii from _COVALENT_RADII dict (Alvarez 2008 values, Å).
+    Unknown elements default to 1.5 Å radius.
+
+    SDF V2000 output structure:
+        Line 1: molecule name
+        Line 2: "     molconvert          3D"
+        Line 3: "" (blank comment)
+        Line 4: counts — f"{n_atoms:3d}{n_bonds:3d}  0  0  0  0  0  0  0  0999 V2000"
+        Lines 5..n_atoms+4: atom block
+            f"{x:10.4f}{y:10.4f}{z:10.4f} {element:<3s} ..."
+        Lines n_atoms+5..end: bond block
+            f"{a1:3d}{a2:3d}{bond_type:3d}  0"
+        "M  END"
+        "$$$$"
+
+
+──────────────────────────────────────────────────
+10. WRITING A PDB FILE — to_pdb()
+──────────────────────────────────────────────────
+
+File: molconvert/builders/reconstruct.py
+Caller: run_convert() → to_pdb(mol_r, model_id)
+
+Call chain:
+  to_pdb(mol, model_id) → str:
+    If model_id is not None, wraps output in MODEL/ENDMDL records.
+    For each atom:
+        _format_atom_record(atom, serial) → 80-character PDB ATOM line
+    Ends with "END".
+
+  _format_atom_record(atom, serial):
+    Standard PDB fixed-width format:
+        Columns  1- 6: record type  "ATOM  "
+        Columns  7-11: serial number (right-justified)
+        Columns 13-16: atom name
+        Columns 17   : alt location indicator (blank)
+        Columns 18-20: residue name
+        Columns 22   : chain ID
+        Columns 23-26: residue sequence number
+        Columns 31-38: x coordinate (8.3f)
+        Columns 39-46: y coordinate (8.3f)
+        Columns 47-54: z coordinate (8.3f)
+        Columns 77-78: element symbol
+
+
+──────────────────────────────────────────────────
+11. RMSD CALCULATION — rmsd_molecules()
+──────────────────────────────────────────────────
+
+File: molconvert/analysis/rmsd.py
+Caller: run_rmsd() or Python API
+
+Call chain:
+  rmsd_molecules(mol1, mol2, atom_filter):
+    └─ _extract_coords(mol1, atom_filter) → coords1  (N×3 numpy array)
+    └─ _extract_coords(mol2, atom_filter) → coords2
+    └─ if len(coords1) ≠ len(coords2): raise ValueError
+    └─ rmsd(coords1, coords2)
+
+  _extract_coords(mol, atom_filter):
+    Iterates mol.atoms; if atom_filter is set, skips atoms whose
+    atom_name is not in the filter list.
+    Returns numpy array of shape (N, 3).
+
+  rmsd(coords1, coords2):
+    diff    = coords1 - coords2          # N×3 array of Δx, Δy, Δz
+    sq_diff = diff ** 2                  # element-wise square
+    msd     = mean(sum(sq_diff, axis=1)) # mean of per-atom squared distances
+    return sqrt(msd)                     # root-mean-square deviation (Å)
+
+  per_atom_deviation(mol1, mol2, atom_filter):
+    Same coordinate extraction; returns a list of dicts:
+        {"chain_id": ..., "residue_name": ..., "residue_seq": ...,
+         "atom_name": ..., "deviation": sqrt(Δx²+Δy²+Δz²)}
+
+
+──────────────────────────────────────────────────
+12. COMPLETE EXAMPLE: convert input.pdb --to zmat -o out.zmat
+──────────────────────────────────────────────────
+
+  1. Shell → run_convert(["input.pdb", "--to", "zmat", "-o", "out.zmat"])
+  2. argparse: in=input.pdb, out_fmt=zmat, output=out.zmat
+  3. in_ext=".pdb" → in_fmt="pdb"
+  4. parse_pdb("input.pdb")
+       → BioPython reads ATOM records
+       → _build_molecule_ic() loops over every atom:
+            calls bond_length(), bond_angle_deg(), dihedral_deg()
+            stores IC + reference indices in AtomIC objects
+       → returns [MoleculeIC]  (one per chain)
+  5. For each MoleculeIC mol:
+       molecule_to_zmat(mol)
+         → writes header + anchor lines
+         → writes data lines with IC values
+         → returns ZMAT string
+  6. Join all ZMAT strings with "\n"
+  7. open("out.zmat", "w").write(output_text)
+  8. print("Wrote out.zmat", file=stderr)
+
+
+──────────────────────────────────────────────────
+13. COMPLETE EXAMPLE: convert molecule.zmat --to pdb -o rebuilt.pdb
+──────────────────────────────────────────────────
+
+  1. Shell → run_convert(["molecule.zmat", "--to", "pdb", "-o", "rebuilt.pdb"])
+  2. argparse: in=molecule.zmat, out_fmt=pdb, output=rebuilt.pdb
+  3. in_ext=".zmat" → in_fmt="zmat"
+  4. load_zmat("molecule.zmat")
+       → reads file text → zmat_to_molecule(text)
+       → parses anchor XYZ from "# anchor" lines
+       → parses IC values from data lines into AtomIC objects
+       → non-anchor atoms have cart_x=None
+       → returns MoleculeIC
+  5. reconstruct(mol)
+       → deep copy
+       → anchors: positions[0,1,2] from cart_x/y/z
+       → for i=3..N-1: place_atom(pos[i-3], pos[i-2], pos[i-1], r, θ, φ)
+            → builds local frame (bc, nbc, n)
+            → d_local from r, θ, φ
+            → M @ d_local + C → global XYZ
+       → writes cart_x/y/z into each atom
+  6. to_pdb(mol_r, model_id=None)
+       → _format_atom_record() for each atom → 80-char PDB lines
+       → returns PDB string
+  7. open("rebuilt.pdb", "w").write(output_text)
+
+
+──────────────────────────────────────────────────
+14. COMPLETE EXAMPLE: convert molecule.sdf --to pdb --remove-hydrogens
+──────────────────────────────────────────────────
+
+  1. Shell → run_convert(["molecule.sdf", "--to", "pdb", "--remove-hydrogens"])
+  2. argparse: in=molecule.sdf, out_fmt=pdb, remove_hydrogens=True
+  3. in_ext=".sdf" → in_fmt="sdf"
+  4. parse_sdf("molecule.sdf", remove_hydrogens=True)
+       → RDKit SDMolSupplier with removeHs=True
+       → hydrogen atoms stripped before conformer is read
+       → IC computed for remaining heavy atoms only
+       → returns [MoleculeIC, ...]
+  5. For each mol:
+       reconstruct(mol)   (positions already set from SDF parser — no-op)
+       to_pdb(mol_r, model_id=i+1)
+  6. Print MODEL/ATOM/ENDMDL blocks to stdout.
