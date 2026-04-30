@@ -574,3 +574,147 @@ Call chain:
     "# n_atoms <n>"        → expected atom count (sanity check)
     "# anchor <i> x y z"  → anchors dict: {i: (x, y, z)}
     "END"                  → stop parsing
+
+    Data line for atom 1 (anchor, no IC):
+        "<idx>  <name>  <resname>  <chain>  <resseq>"
+        → AtomIC(bond_length=None, bond_angle=None, dihedral=None)
+        → cart_x/y/z filled from anchors dict
+
+    Data line for atom 2 (has bond only):
+        "<idx>  <name>  <resname>  <chain>  <resseq>
+         <bond_to>  <bond_length>"
+        → AtomIC(bond_length=float, bond_angle=None, dihedral=None)
+        → cart_x=None (set later by reconstruct)
+
+    Data line for atom i ≥ 4 (full IC):
+        "<idx> <name> <resname> <chain> <resseq>
+         <bond_to> <bond_length>  <angle_to> <bond_angle>
+         <dihedral_to> <dihedral>"
+        → AtomIC with all three IC values + reference indices
+        → cart_x=None
+
+    _element_from_name(atom_name):
+        Strips leading digits and returns first alphabetic character.
+        "CA" → "C",  "OD1" → "O",  "HG11" → "H"
+
+    Returns MoleculeIC. Positions for non-anchor atoms are not set yet;
+    reconstruct() fills them in.
+
+
+──────────────────────────────────────────────────
+6. RECONSTRUCTING POSITIONS — reconstruct()
+──────────────────────────────────────────────────
+
+File: molconvert/builders/reconstruct.py
+Caller: run_convert() → reconstruct(mol)  (for PDB/SDF output)
+        run_rmsd()    → reconstruct(mol1)  (for --self test)
+
+Call chain:
+  reconstruct(mol):
+    └─ deep copy of mol so the original is not mutated
+    └─ Build positions[] list:
+         Atom 0: positions[0] = (cart_x, cart_y, cart_z)   ← anchor, already set
+         Atom 1: positions[1] = (cart_x, cart_y, cart_z)   ← anchor, already set
+         Atom 2: positions[2] = (cart_x, cart_y, cart_z)   ← anchor, already set
+         Atom i ≥ 3:
+           positions[i] = place_atom(
+               positions[i-3],   # A  (dihedral reference)
+               positions[i-2],   # B  (angle reference)
+               positions[i-1],   # C  (bond reference)
+               atom.bond_length,
+               atom.bond_angle,
+               atom.dihedral,
+           )
+         Writes cart_x, cart_y, cart_z back to atom object.
+
+
+──────────────────────────────────────────────────
+7. THE NERF ALGORITHM — place_atom()
+──────────────────────────────────────────────────
+
+File: molconvert/core/geometry.py → place_atom(A, B, C, r, θ, φ)
+
+This is the mathematical core. Given three known atoms A, B, C and the
+IC values for the new atom D, it computes D's XYZ position.
+
+Step 1 — build the new atom position in a local coordinate frame:
+    bc   = (C - B) / |C - B|           # unit vector along B→C
+    nbc  = cross(B - A, bc)
+    nbc /= |nbc|                        # normal to the A-B-C plane
+    n    = cross(bc, nbc)               # completes the right-hand frame
+
+    r     = bond_length (Å)
+    θ     = bond_angle  (degrees) → radians
+    φ     = dihedral    (degrees) → radians
+
+    d_local = [
+        -r × cos(θ),
+         r × sin(θ) × cos(φ),
+         r × sin(θ) × sin(φ),
+    ]
+
+Step 2 — rotate to global frame:
+    M = column_stack([-bc, nbc, n])     # 3×3 rotation matrix
+    D = M @ d_local + C                 # global position of D
+
+The anchor atoms define the absolute position and orientation of the
+entire molecule. Every subsequent atom is placed relative to the three
+atoms before it, chained like links in a coordinate frame.
+
+
+──────────────────────────────────────────────────
+8. WRITING A ZMAT FILE — molecule_to_zmat()
+──────────────────────────────────────────────────
+
+File: molconvert/converters/json_to_zmat.py
+Caller: run_convert() → molecule_to_zmat(mol)
+
+Call chain:
+  molecule_to_zmat(mol) → str:
+    Header block:
+        "ZMAT <mol.name>\n"
+        "# source_fmt <mol.source_fmt>\n"
+        "# n_atoms <len(mol.atoms)>\n"
+        For each of the first 3 atoms (anchors) that have cart_x set:
+            "# anchor <i+1>   <x>   <y>   <z>\n"
+
+    Data lines (one per atom):
+        Atom 1 (anchor):
+            "   1  <name>  <resname>  <chain>  <resseq>\n"
+        Atom 2 (bond only):
+            "   2  <name>  <resname>  <chain>  <resseq>
+                  <bond_to>  <bond_length:.6f>\n"
+        Atom i ≥ 4 (full IC):
+            "   <i>  <name>  <resname>  <chain>  <resseq>
+                  <bond_to>  <bond_length:.6f>
+                  <angle_to>  <bond_angle:.6f>
+                  <dihedral_to>  <dihedral:.6f>\n"
+        "END\n"
+
+    Reference indices (bond_to, angle_to, dihedral_to) are read from
+    the AtomIC fields. If an atom was parsed from PDB/SDF, these are
+    already set (i, i-1, i-2). If from old JSON without these fields,
+    falls back to sequential defaults.
+
+
+──────────────────────────────────────────────────
+9. WRITING AN SDF FILE — molecule_to_sdf()
+──────────────────────────────────────────────────
+
+File: molconvert/builders/to_sdf.py
+Caller: run_convert() → molecule_to_sdf(mol_r)
+        (mol_r has positions set — either from parsing or from reconstruct)
+
+Call chain:
+  molecule_to_sdf(mol) → str:
+    Validation: raises ValueError if any non-anchor atom has no position.
+
+    bonds = _infer_bonds(atoms):
+        For every pair (i, j) with i < j:
+            dx = atoms[j].cart_x - atoms[i].cart_x
+            dy = atoms[j].cart_y - atoms[i].cart_y
+            dz = atoms[j].cart_z - atoms[i].cart_z
+            dist² = dx² + dy² + dz²
+            threshold² = (radii[i] + radii[j])² × 1.3²
+            if dist² < threshold²:
+                append (i+1, j+1, 1)   ← 1-based atom indices, bond type 1
