@@ -25,3 +25,7 @@ test_*.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Graphify & Local agent config
+graphify-out/
+.agents/
