@@ -1,0 +1,78 @@
+ Entering Gaussian System, Link 0=g16
+ Initial command:
+ /opt/gaussian/g16/l1.exe
+ Default is to use a total of   8 processors.
+ *******************************************
+ Gaussian 16:  ES64L-G16RevC.02  1-Mar-2023
+                10-Jul-2026
+ *******************************************
+ %chk=water.chk
+ %mem=1GB
+ %nproc=8
+ -----------------------------------------------
+ #HF/6-31G(d) opt
+ -----------------------------------------------
+ 1/38=1,172=1/1;
+ 2/12=2,17=6,18=5,40=1/2;
+ Title Card Required
+ ---
+ Water molecule optimization
+ ---
+ Charge =  0 Multiplicity = 1
+ Symbolic Z-matrix:
+ O                     0.        0.        0.11779
+ H                     0.        0.75791  -0.47116
+ H                     0.       -0.75791  -0.47116
+
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+  Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.117790
+      2          1           0        0.000000    0.757913   -0.471161
+      3          1           0        0.000000   -0.757913   -0.471161
+ ---------------------------------------------------------------------
+ Rotational constants (GHZ):    795.3366    436.6595    282.0032
+ Standard basis: 6-31G(d) (6D, 7F)
+ There are    10 symmetry adapted cartesian basis functions of A1  symmetry.
+ There are     1 symmetry adapted cartesian basis functions of A2  symmetry.
+ There are     3 symmetry adapted cartesian basis functions of B1  symmetry.
+ There are     5 symmetry adapted cartesian basis functions of B2  symmetry.
+
+ SCF Done:  E(RHF) =  -75.5857819262     A.U. after    8 cycles
+
+ ***** Axes restored to original set *****
+
+         Item               Value     Threshold  Converged?
+ Maximum Force            0.045331     0.000450     NO
+ RMS     Force            0.032050     0.000300     NO
+ Maximum Displacement     0.122906     0.001800     NO
+ RMS     Displacement     0.086926     0.001200     NO
+ Predicted change in Energy=-3.924203D-03
+
+ Optimization completed on step number   2.
+
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+  Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.010000    0.000000    0.117790
+      2          1           0        0.010000    0.757913   -0.471161
+      3          1           0        0.010000   -0.757913   -0.471161
+ ---------------------------------------------------------------------
+ Rotational constants (GHZ):    795.3366    436.6595    282.0032
+
+ SCF Done:  E(RHF) =  -75.5860712453     A.U. after    7 cycles
+
+         Item               Value     Threshold  Converged?
+ Maximum Force            0.000032     0.000450     YES
+ RMS     Force            0.000023     0.000300     YES
+ Maximum Displacement     0.000156     0.001800     YES
+ RMS     Displacement     0.000110     0.001200     YES
+ Predicted change in Energy=-1.234567D-08
+ Optimization completed.
+    -- Stationary point found.
+
+ Normal termination of Gaussian 16 at Thu Jul 10 20:00:00 2026.
