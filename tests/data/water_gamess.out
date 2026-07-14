@@ -1,0 +1,73 @@
+          ******************************************************
+          *         GAMESS VERSION = 20 JAN 2023 (R1)          *
+          *             FROM IOWA STATE UNIVERSITY             *
+          *         M.W.SCHMIDT, K.K.BALDRIDGE, J.A.BOATZ,     *
+          *             S.T.ELBERT, M.S.GORDON,                *
+          *             J.H.JENSEN, S.KOSEKI, N.MATSUNAGA,     *
+          *             K.A.NGUYEN, S.SU, T.L.WINDUS,          *
+          *         TOGETHER WITH M.DUPUIS, J.A.MONTGOMERY     *
+          *             J.COMPUT.CHEM.  14, 1347-1363(1993)    *
+          ******************************************************
+
+     $CONTRL OPTIONS
+     ---------------
+     SCFTYP=RHF          RUNTYP=ENERGY       EXETYP=RUN
+     MPLEVL=       0     CITYP =NONE         CCTYP =NONE
+     MULT  =       1     ICHARG=       0     NZVAR =       0
+     COORD =UNIQUE       UNITS =ANGS
+
+     $SYSTEM OPTIONS
+     ---------------
+     TIMLIM=       525600.00 MINUTES
+     MEMORY=      1000000
+
+     ATOM      ATOMIC                      COORDINATES (BOHR)
+                CHARGE         X                   Y                   Z
+     O           8.0     0.0000000000        0.0000000000        0.2225346572
+     H           1.0     0.0000000000        1.4322009240       -0.8901386290
+     H           1.0     0.0000000000       -1.4322009240       -0.8901386290
+
+     ATOMIC BASIS SET
+     ----------------
+     THE CONTRACTED PRIMITIVE FUNCTIONS HAVE BEEN UNNORMALIZED
+     THE CONTRACTED FUNCTIONS ARE NOW NORMALIZED TO UNITY
+
+     SHELL TYPE  PRIMITIVE        EXPONENT          CONTRACTION COEFFICIENT(S)
+
+     O
+
+       1   S       1           130.7093214    0.015432896730
+       1   S       2            23.8088661    0.095353424650
+       1   S       3             6.4436083    0.305468951050
+
+       2   S       4             5.0331513   -0.099967229188
+       2   S       5             1.1695961    0.399512826090
+       2   S       6             0.3803890    0.700115468885
+
+     TOTAL NUMBER OF BASIS SET SHELLS             =    5
+     NUMBER OF CARTESIAN GAUSSIAN BASIS FUNCTIONS =    7
+     NUMBER OF ELECTRONS                          =   10
+     CHARGE OF MOLECULE                           =    0
+     SPIN MULTIPLICITY                            =    1
+     NUMBER OF OCCUPIED ORBITALS (ALPHA)           =    5
+     NUMBER OF OCCUPIED ORBITALS (BETA )           =    5
+
+          COORDINATES OF ALL ATOMS ARE (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ -------- ---------- -------------- -------------- --------------
+ O           8.0      0.0000000000   0.0000000000   0.1177900000
+ H           1.0      0.0000000000   0.7579130000  -0.4711610000
+ H           1.0      0.0000000000  -0.7579130000  -0.4711610000
+
+          INTERNUCLEAR DISTANCES (ANGS.)
+          ------------------------------
+
+                1  O          2  H          3  H
+
+   1  O      0.0000000    0.9697220    0.9697220
+   2  H      0.9697220    0.0000000    1.5158260
+   3  H      0.9697220    1.5158260    0.0000000
+
+     TOTAL ENERGY =      -74.9659012100
+
+ EXECUTION OF GAMESS TERMINATED NORMALLY
