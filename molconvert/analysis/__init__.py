@@ -7,6 +7,13 @@ from .rmsd import (
     ic_summary,
     ICSummary,
 )
+from .validation import (
+    validate_molecule,
+    validate_molecules,
+    format_report,
+    ValidationReport,
+    ValidationIssue,
+)
 
 __all__ = [
     "rmsd",
@@ -16,4 +23,9 @@ __all__ = [
     "per_atom_deviation",
     "ic_summary",
     "ICSummary",
+    "validate_molecule",
+    "validate_molecules",
+    "format_report",
+    "ValidationReport",
+    "ValidationIssue",
 ]
