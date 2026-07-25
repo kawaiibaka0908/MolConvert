@@ -4,14 +4,14 @@ CLI entry points for molconvert.
 Commands
 --------
 convert  : Convert molecular structure files between formats.
-           Supported input  : .pdb, .sdf, .zmat
-           Supported output : json (internal IR), pdb, sdf, zmat, internal (alias for json)
+           Supported input  : .pdb, .sdf, .zmat, .log, .out, .mol2
+           Supported output : json, pdb, sdf, zmat, internal, mol2, xyz, gro, gjf, inp
 rmsd     : RMSD between two PDB files, or a round-trip self-test on one file.
 
 Entry points (setup.py)
 -----------------------
-    convert  →  molconvert.cli.main:run_convert
-    rmsd     →  molconvert.cli.main:run_rmsd
+    convert  ->  molconvert.cli.main:run_convert
+    rmsd     ->  molconvert.cli.main:run_rmsd
 """
 
 from __future__ import annotations
@@ -22,11 +22,53 @@ from pathlib import Path
 
 from ..parsers.pdb_parser import parse_pdb
 from ..parsers.sdf_parser import parse_sdf
+from ..parsers.gaussian_parser import parse_gaussian
+from ..parsers.gamess_parser import parse_gamess
+from ..parsers.mol2_parser import parse_mol2
 from ..builders.reconstruct import reconstruct, to_pdb, save_pdb
 from ..builders.to_sdf import molecule_to_sdf, molecules_to_sdf
+from ..builders.to_mol2 import molecule_to_mol2
+from ..builders.to_xyz import molecule_to_xyz
+from ..builders.to_gro import molecule_to_gro
+from ..builders.to_gaussian import molecule_to_gaussian
+from ..builders.to_gamess import molecule_to_gamess
 from ..converters.json_to_zmat import molecule_to_zmat
 from ..converters.zmat_to_json import load_zmat
 from ..analysis import rmsd_molecules, per_atom_deviation, ic_summary
+from ..analysis.validation import validate_molecules, format_report
+
+
+# Supported input extensions and the formats they map to.
+_INPUT_EXT_MAP = {
+    ".pdb": "pdb",
+    ".sdf": "sdf",
+    ".zmat": "zmat",
+    ".log": "gaussian",
+    ".mol2": "mol2",
+    # .out is ambiguous (Gaussian or GAMESS) — resolved via --input-format
+}
+
+# Supported output format tokens.
+_OUTPUT_FORMATS = [
+    "json", "pdb", "sdf", "zmat", "internal",
+    "mol2", "xyz", "gro", "gjf", "inp",
+]
+
+# Map output-format token to file extension for batch mode.
+_FMT_TO_EXT = {
+    "json": ".json",
+    "pdb": ".pdb",
+    "sdf": ".sdf",
+    "zmat": ".zmat",
+    "mol2": ".mol2",
+    "xyz": ".xyz",
+    "gro": ".gro",
+    "gjf": ".gjf",
+    "inp": ".inp",
+}
+
+# Extensions we can auto-detect when globbing a directory for batch input.
+_BATCH_EXTENSIONS = {".pdb", ".sdf", ".zmat", ".log", ".out", ".mol2"}
 
 
 # ------------------------------------------------------------------ #
@@ -41,35 +83,68 @@ def run_convert(argv: list[str] | None = None) -> None:
             "Convert molecular structure files between formats.\n\n"
             "  convert protein.pdb --to zmat\n"
             "  convert molecule.zmat --to pdb\n"
-            "  convert molecule.zmat --to internal\n"
-            "  convert input.pdb                   (default: json)\n"
+            "  convert molecule.mol2 --to sdf\n"
+            "  convert calc.log --to pdb\n"
+            "  convert calc.out --input-format gamess --to xyz\n"
+            "  convert data_dir/ --to mol2 -o output_dir/\n"
+            "  convert molecule.pdb --to mol2 --validate\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("input", metavar="INPUT",
-                        help="Input file (.pdb, .sdf, or .zmat).")
+                        help="Input file or directory (batch mode).")
     parser.add_argument("-o", "--output", metavar="PATH", default=None,
-                        help="Output file path. Defaults to stdout.")
+                        help="Output file path (single file) or directory (batch).")
     parser.add_argument("--to", dest="to_fmt",
-                        choices=["json", "pdb", "sdf", "zmat", "internal"],
+                        choices=_OUTPUT_FORMATS,
                         default=None,
-                        help="Output format: json, pdb, sdf, zmat, or internal "
-                             "(internal is an alias for json). Default: json.")
+                        help="Output format. Default: json.")
     # Keep -f/--format as a backward-compatible alias.
     parser.add_argument("-f", "--format", dest="fmt_legacy",
                         choices=["json", "pdb", "sdf", "zmat", "internal"],
                         default=None,
                         help=argparse.SUPPRESS)
-    # PDB-specific options (ignored for .sdf / .zmat input)
+
+    # --- Input format disambiguation ---
+    parser.add_argument("--input-format", dest="input_fmt",
+                        choices=["gaussian", "gamess"],
+                        default=None,
+                        help="Explicitly specify input format for .out files.")
+    parser.add_argument("--step", default="last",
+                        help="Geometry step to extract (gaussian/gamess): "
+                             "'last', 'all', or integer N (0-indexed).")
+
+    # --- PDB-specific options ---
     parser.add_argument("--model", type=int, default=0, metavar="N",
                         help="MODEL record index to read (default: 0, PDB only).")
     parser.add_argument("--include-hetatm", action="store_true",
                         help="Also process HETATM ligand records (PDB only).")
     parser.add_argument("--chain", metavar="ID", default=None,
                         help="Only output the specified chain, e.g. A (PDB only).")
-    # SDF-specific options (ignored for .pdb / .zmat input)
+
+    # --- SDF-specific options ---
     parser.add_argument("--remove-hydrogens", action="store_true",
                         help="Strip hydrogen atoms before conversion (SDF input only).")
+
+    # --- Gaussian / GAMESS input builder options ---
+    parser.add_argument("--charge", type=int, default=0,
+                        help="Molecular charge (gjf/inp output only). Default: 0.")
+    parser.add_argument("--multiplicity", type=int, default=1,
+                        help="Spin multiplicity (gjf/inp output only). Default: 1.")
+    parser.add_argument("--route", default="# HF/6-31G(d) opt",
+                        help="Gaussian route section (gjf output only).")
+
+    # --- Batch mode ---
+    parser.add_argument("--recursive", action="store_true",
+                        help="Recurse into subdirectories in batch mode.")
+
+    # --- Validation ---
+    parser.add_argument("--validate", action="store_true",
+                        help="Run chemical validation after conversion.")
+    parser.add_argument("--report", metavar="PATH", default=None,
+                        help="Write detailed validation report to file.")
+
+    # --- Summary ---
     parser.add_argument("--summary", action="store_true",
                         help="Print IC statistics to stderr after conversion.")
 
@@ -80,100 +155,114 @@ def run_convert(argv: list[str] | None = None) -> None:
     if out_fmt == "internal":
         out_fmt = "json"
 
-    # Auto-detect input format from file extension
-    in_ext = Path(args.input).suffix.lower()
-    if in_ext == ".pdb":
-        in_fmt = "pdb"
-    elif in_ext == ".sdf":
-        in_fmt = "sdf"
-    elif in_ext == ".zmat":
-        in_fmt = "zmat"
+    # ------------------------------------------------------------------ #
+    #  Batch mode: input is a directory                                    #
+    # ------------------------------------------------------------------ #
+    input_path = Path(args.input)
+    if input_path.is_dir():
+        _run_batch(args, input_path, out_fmt)
+        return
+
+    # ------------------------------------------------------------------ #
+    #  Single file mode                                                    #
+    # ------------------------------------------------------------------ #
+
+    # Detect input format
+    in_fmt = _detect_input_format(args.input, args.input_fmt)
+
+    # Load molecules
+    molecules = _load_molecules(args, in_fmt)
+
+    # Build output and optionally validate
+    _convert_and_write(args, molecules, out_fmt)
+
+
+# ------------------------------------------------------------------ #
+#  Batch mode                                                          #
+# ------------------------------------------------------------------ #
+
+def _run_batch(args, input_dir: Path, out_fmt: str) -> None:
+    """Process all supported files in *input_dir*."""
+    # Determine output directory
+    if args.output:
+        out_dir = Path(args.output)
+        out_dir.mkdir(parents=True, exist_ok=True)
     else:
-        _die(
-            f"Cannot detect input format for '{args.input}'. "
-            "Supported extensions: .pdb, .sdf, .zmat"
-        )
+        out_dir = input_dir
 
-    # ------------------------------------------------------------------ #
-    #  Load molecules                                                      #
-    # ------------------------------------------------------------------ #
+    # Collect input files
+    glob_fn = input_dir.rglob if args.recursive else input_dir.glob
+    input_files = sorted(
+        f for f in glob_fn("*")
+        if f.is_file() and f.suffix.lower() in _BATCH_EXTENSIONS
+    )
 
-    if in_fmt == "pdb":
+    if not input_files:
+        _die(f"No supported files found in '{input_dir}'.")
+
+    all_reports = []
+    converted = 0
+    failed = 0
+
+    for fpath in input_files:
         try:
-            molecules = parse_pdb(
-                args.input,
-                model_id=args.model,
-                include_hetatm=args.include_hetatm,
-            )
+            in_fmt = _detect_input_format(str(fpath), args.input_fmt)
+            molecules = _load_molecules_from_path(fpath, in_fmt, args)
+
+            # Build output text
+            out_text = _build_output(molecules, out_fmt, args)
+
+            # Determine output file path
+            out_ext = _FMT_TO_EXT.get(out_fmt, f".{out_fmt}")
+            out_file = out_dir / (fpath.stem + out_ext)
+            out_file.write_text(out_text + "\n", encoding="utf-8")
+
+            converted += 1
+            print(f"  [OK] {fpath.name} -> {out_file.name}", file=sys.stderr)
+
+            # Validation
+            if args.validate:
+                from ..analysis.validation import validate_molecules, format_report
+                reports = validate_molecules(
+                    [reconstruct(m) for m in molecules]
+                )
+                all_reports.extend(reports)
+
+        except SystemExit as exc:
+            # _die() raises SystemExit(1) — in batch mode, skip the file.
+            # Only count non-zero exits as failures.
+            if exc.code != 0:
+                failed += 1
         except Exception as exc:
-            _die(f"Failed to parse '{args.input}': {exc}")
+            failed += 1
+            print(f"  [FAIL] {fpath.name}: {exc}", file=sys.stderr)
 
-        if not molecules:
-            _die("No ATOM records found in the file.")
+    # Summary
+    print(
+        f"\nBatch complete: {converted} converted, {failed} failed "
+        f"(out of {len(input_files)} files).",
+        file=sys.stderr,
+    )
 
-        if args.chain:
-            molecules = [m for m in molecules if m.name.endswith(f"_{args.chain}")]
-            if not molecules:
-                _die(f"Chain '{args.chain}' not found in '{args.input}'.")
+    # Validation report
+    if args.validate and all_reports:
+        summary = format_report(all_reports, verbose=True)
+        print("\n--- Validation Report ---", file=sys.stderr)
+        print(summary, file=sys.stderr)
+        if args.report:
+            Path(args.report).write_text(summary + "\n", encoding="utf-8")
+            print(f"Report written to {args.report}", file=sys.stderr)
 
-    elif in_fmt == "sdf":
-        try:
-            molecules = parse_sdf(
-                args.input,
-                remove_hydrogens=args.remove_hydrogens,
-            )
-        except Exception as exc:
-            _die(f"Failed to parse '{args.input}': {exc}")
 
-        if not molecules:
-            _die("No valid molecule records found in the file.")
+# ------------------------------------------------------------------ #
+#  Single-file conversion core                                         #
+# ------------------------------------------------------------------ #
 
-    else:  # zmat
-        try:
-            mol = load_zmat(args.input)
-        except Exception as exc:
-            _die(f"Failed to parse '{args.input}': {exc}")
-        molecules = [mol]
+def _convert_and_write(args, molecules, out_fmt: str) -> None:
+    """Build output string from molecules, write to file/stdout, validate."""
+    output_text = _build_output(molecules, out_fmt, args)
 
-    # ------------------------------------------------------------------ #
-    #  Build output                                                        #
-    # ------------------------------------------------------------------ #
-
-    chunks: list[str] = []
-
-    for mol in molecules:
-        if out_fmt == "json":
-            chunks.append(mol.to_json())
-
-        elif out_fmt in ("pdb", "sdf"):
-            # Both PDB and SDF output need full Cartesian positions.
-            # reconstruct() is a no-op when positions are already set (PDB/SDF
-            # input); it computes positions from IC when they are not (ZMAT input).
-            try:
-                mol_r = reconstruct(mol)
-            except Exception as exc:
-                _die(f"Reconstruction failed for '{mol.name}': {exc}")
-
-            if out_fmt == "pdb":
-                model_id = None if len(molecules) == 1 else molecules.index(mol) + 1
-                chunks.append(to_pdb(mol_r, model_id=model_id))
-            else:
-                chunks.append(molecule_to_sdf(mol_r))
-
-        elif out_fmt == "zmat":
-            chunks.append(molecule_to_zmat(mol))
-
-        if args.summary:
-            summary = ic_summary(mol)
-            print(f"\n[{mol.name}]", file=sys.stderr)
-            print(summary, file=sys.stderr)
-
-    output_text = "\n".join(chunks)
-
-    # ------------------------------------------------------------------ #
-    #  Write output                                                        #
-    # ------------------------------------------------------------------ #
-
+    # Write output
     if args.output:
         try:
             with open(args.output, "w") as fh:
@@ -184,6 +273,196 @@ def run_convert(argv: list[str] | None = None) -> None:
             _die(f"Cannot write to '{args.output}': {exc}")
     else:
         print(output_text)
+
+    # IC summary
+    if args.summary:
+        for mol in molecules:
+            summary = ic_summary(mol)
+            print(f"\n[{mol.name}]", file=sys.stderr)
+            print(summary, file=sys.stderr)
+
+    # Validation
+    if args.validate:
+        reconstructed = []
+        for mol in molecules:
+            try:
+                reconstructed.append(reconstruct(mol))
+            except Exception:
+                reconstructed.append(mol)  # use as-is if reconstruct fails
+
+        reports = validate_molecules(reconstructed)
+        summary_text = format_report(reports, verbose=True)
+        print("\n--- Validation Report ---", file=sys.stderr)
+        print(summary_text, file=sys.stderr)
+
+        if args.report:
+            Path(args.report).write_text(summary_text + "\n", encoding="utf-8")
+            print(f"Report written to {args.report}", file=sys.stderr)
+
+
+def _build_output(molecules, out_fmt: str, args) -> str:
+    """Build the output text for a list of molecules in the given format."""
+    chunks: list[str] = []
+
+    for mol in molecules:
+        if out_fmt == "json":
+            chunks.append(mol.to_json())
+
+        elif out_fmt == "zmat":
+            chunks.append(molecule_to_zmat(mol))
+
+        else:
+            # All other formats need Cartesian positions.
+            try:
+                mol_r = reconstruct(mol)
+            except Exception as exc:
+                _die(f"Reconstruction failed for '{mol.name}': {exc}")
+
+            if out_fmt == "pdb":
+                model_id = None if len(molecules) == 1 else molecules.index(mol) + 1
+                chunks.append(to_pdb(mol_r, model_id=model_id))
+            elif out_fmt == "sdf":
+                chunks.append(molecule_to_sdf(mol_r))
+            elif out_fmt == "mol2":
+                chunks.append(molecule_to_mol2(mol_r))
+            elif out_fmt == "xyz":
+                chunks.append(molecule_to_xyz(mol_r))
+            elif out_fmt == "gro":
+                chunks.append(molecule_to_gro(mol_r))
+            elif out_fmt == "gjf":
+                chunks.append(molecule_to_gaussian(
+                    mol_r,
+                    route=args.route,
+                    charge=args.charge,
+                    multiplicity=args.multiplicity,
+                ))
+            elif out_fmt == "inp":
+                chunks.append(molecule_to_gamess(
+                    mol_r,
+                    charge=args.charge,
+                    multiplicity=args.multiplicity,
+                ))
+
+    return "\n".join(chunks)
+
+
+# ------------------------------------------------------------------ #
+#  Input format detection                                              #
+# ------------------------------------------------------------------ #
+
+def _detect_input_format(filepath: str, explicit_fmt: str | None) -> str:
+    """Resolve the input format from the file extension and --input-format."""
+    ext = Path(filepath).suffix.lower()
+
+    if ext == ".out":
+        if explicit_fmt:
+            return explicit_fmt
+        _die(
+            f"Ambiguous '.out' extension for '{filepath}'. "
+            "Use --input-format gaussian or --input-format gamess."
+        )
+
+    if ext in _INPUT_EXT_MAP:
+        return _INPUT_EXT_MAP[ext]
+
+    if explicit_fmt:
+        return explicit_fmt
+
+    _die(
+        f"Cannot detect input format for '{filepath}'. "
+        "Supported extensions: .pdb, .sdf, .zmat, .log, .out, .mol2. "
+        "Use --input-format for ambiguous extensions."
+    )
+
+
+# ------------------------------------------------------------------ #
+#  Molecule loading                                                    #
+# ------------------------------------------------------------------ #
+
+def _load_molecules(args, in_fmt: str) -> list:
+    """Load molecules from a single file based on parsed CLI args."""
+    return _load_molecules_from_path(Path(args.input), in_fmt, args)
+
+
+def _load_molecules_from_path(fpath: Path, in_fmt: str, args) -> list:
+    """Load molecules from *fpath* using format *in_fmt*."""
+    filepath = str(fpath)
+
+    if in_fmt == "pdb":
+        try:
+            molecules = parse_pdb(
+                filepath,
+                model_id=getattr(args, "model", 0),
+                include_hetatm=getattr(args, "include_hetatm", False),
+            )
+        except Exception as exc:
+            _die(f"Failed to parse '{filepath}': {exc}")
+
+        if not molecules:
+            _die(f"No ATOM records found in '{filepath}'.")
+
+        chain = getattr(args, "chain", None)
+        if chain:
+            molecules = [m for m in molecules if m.name.endswith(f"_{chain}")]
+            if not molecules:
+                _die(f"Chain '{chain}' not found in '{filepath}'.")
+
+        return molecules
+
+    elif in_fmt == "sdf":
+        try:
+            molecules = parse_sdf(
+                filepath,
+                remove_hydrogens=getattr(args, "remove_hydrogens", False),
+            )
+        except Exception as exc:
+            _die(f"Failed to parse '{filepath}': {exc}")
+
+        if not molecules:
+            _die(f"No valid molecule records found in '{filepath}'.")
+        return molecules
+
+    elif in_fmt == "zmat":
+        try:
+            mol = load_zmat(filepath)
+        except Exception as exc:
+            _die(f"Failed to parse '{filepath}': {exc}")
+        return [mol]
+
+    elif in_fmt == "gaussian":
+        step = getattr(args, "step", "last")
+        try:
+            molecules = parse_gaussian(filepath, step=step)
+        except Exception as exc:
+            _die(f"Failed to parse '{filepath}': {exc}")
+
+        if not molecules:
+            _die(f"No geometry blocks found in '{filepath}'.")
+        return molecules
+
+    elif in_fmt == "gamess":
+        step = getattr(args, "step", "last")
+        try:
+            molecules = parse_gamess(filepath, step=step)
+        except Exception as exc:
+            _die(f"Failed to parse '{filepath}': {exc}")
+
+        if not molecules:
+            _die(f"No geometry blocks found in '{filepath}'.")
+        return molecules
+
+    elif in_fmt == "mol2":
+        try:
+            molecules = parse_mol2(filepath)
+        except Exception as exc:
+            _die(f"Failed to parse '{filepath}': {exc}")
+
+        if not molecules:
+            _die(f"No molecules found in '{filepath}'.")
+        return molecules
+
+    else:
+        _die(f"Unsupported input format: '{in_fmt}'.")
 
 
 # ------------------------------------------------------------------ #
@@ -259,7 +538,7 @@ def run_rmsd(argv: list[str] | None = None) -> None:
 
     filter_label = f" [{args.filter}]" if args.filter else ""
     method_label = "" if superpose else " (no superposition)"
-    print(f"RMSD{filter_label}{method_label}: {r:.4f} Å")
+    print(f"RMSD{filter_label}{method_label}: {r:.4f} \u00c5")
     print(f"  {label1}")
     print(f"  {label2}")
 
@@ -271,7 +550,7 @@ def run_rmsd(argv: list[str] | None = None) -> None:
             _die(str(exc))
 
         print()
-        print(f"{'Chain':>5}  {'Res':>4}  {'ResSeq':>6}  {'Atom':>4}  {'Dev (Å)':>8}")
+        print(f"{'Chain':>5}  {'Res':>4}  {'ResSeq':>6}  {'Atom':>4}  {'Dev (\u00c5)':>8}")
         print("-" * 36)
         for rec in deviations:
             print(
@@ -283,7 +562,7 @@ def run_rmsd(argv: list[str] | None = None) -> None:
             )
         print("-" * 36)
         max_dev = max(r["deviation"] for r in deviations)
-        print(f"Max deviation: {max_dev:.4f} Å")
+        print(f"Max deviation: {max_dev:.4f} \u00c5")
 
 
 # ------------------------------------------------------------------ #
