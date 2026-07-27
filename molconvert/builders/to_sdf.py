@@ -62,6 +62,11 @@ def molecule_to_sdf(mol: MoleculeIC) -> str:
     lines.append("")
 
     # ---- Counts line ----
+    if n_atoms > 999 or n_bonds > 999:
+        raise ValueError(
+            f"SDF V2000 format supports at most 999 atoms and 999 bonds "
+            f"(got {n_atoms} atoms, {n_bonds} bonds). Use V3000 for larger molecules."
+        )
     lines.append(f"{n_atoms:3d}{n_bonds:3d}  0  0  0  0  0  0  0  0999 V2000")
 
     # ---- Atom block ----
@@ -103,7 +108,7 @@ def save_sdf_multi(mols: list[MoleculeIC], path: str) -> None:
 
 def _require_positions(mol: MoleculeIC) -> None:
     for atom in mol.atoms:
-        if atom.cart_x is None:
+        if atom.cart_x is None or atom.cart_y is None or atom.cart_z is None:
             raise ValueError(
                 f"Atom {atom.atom_serial} ({atom.atom_name}) has no "
                 "Cartesian position — run reconstruct() first."
