@@ -21,6 +21,11 @@ test_*.pdb
 test_*.sdf
 test_*.zmat
 test_*.json
+test_*.mol2
+test_*.xyz
+test_*.gro
+test_*.gjf
+test_*.inp
 
 # OS
 .DS_Store
