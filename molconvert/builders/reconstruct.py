@@ -78,16 +78,13 @@ def reconstruct(mol: MoleculeIC) -> MoleculeIC:
             b_idx = (atom.angle_to   - 1) if atom.angle_to   is not None else (i - 2)
             c_idx = (atom.bond_to    - 1) if atom.bond_to    is not None else (i - 1)
 
-            # Round angles/dihedrals to match ZMAT storage precision (0.01°).
-            # This ensures a small but realistic RMSD when comparing
-            # reconstructed vs original coordinates rather than exact 0.
             pos = place_atom(
                 positions[a_idx],
                 positions[b_idx],
                 positions[c_idx],
                 atom.bond_length,
-                round(atom.bond_angle, 2),
-                round(atom.dihedral, 2),
+                atom.bond_angle,
+                atom.dihedral,
             )
             atom.position = pos
             positions.append(pos)
