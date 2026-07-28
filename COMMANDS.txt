@@ -5,10 +5,11 @@ SETUP
 -----
 Requirements:
     - Python 3.9 or newer  (check with: python --version)
-    - pip (comes with Python)
+    - git (to clone repo)
 
-Install the package (run once, from inside the molconvert/ folder):
-    cd molconvert
+Install the package:
+    git clone https://github.com/kawaiibaka0908/MolConvert.git
+    cd MolConvert
     pip install -e .
 
 This automatically installs all dependencies:

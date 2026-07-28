@@ -81,26 +81,46 @@ No manual installation of numpy, biopython, or rdkit is needed — `pip install 
 
 ---
 
-## Installation
+## Installation & Setup
 
-**Step 1** — Copy the `molconvert/` folder to the target machine. 
+### Quickstart (Clone & Install)
 
-**Step 2** — Open a terminal, navigate into the folder, and install:
-
+**Step 1** — Clone the repository:
 
 ```bash
-cd molconvert
+git clone https://github.com/kawaiibaka0908/MolConvert.git
+cd MolConvert
+```
+
+**Step 2** — (Optional but recommended) Create and activate a virtual environment:
+
+```bash
+# On Linux / macOS:
+python -m venv venv
+source venv/bin/activate
+
+# On Windows (PowerShell):
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+**Step 3** — Install `molconvert` in editable mode:
+
+```bash
 pip install -e .
 ```
 
-**Step 3** — Verify the install:
+This automatically installs all required dependencies (`numpy`, `biopython`, `rdkit`).
+
+**Step 4** — Verify the installation:
 
 ```bash
 convert --help
 rmsd --help
 ```
 
-After installation, two commands are available anywhere in the terminal: `convert` and `rmsd`.
+After installation, two commands are available anywhere in your terminal: `convert` and `rmsd`.
+
 
 ---
 
