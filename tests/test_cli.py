@@ -147,7 +147,8 @@ def test_rmsd_self_per_atom(capsys):
 def test_rmsd_self_with_filter(capsys):
     run_rmsd([MINI_PDB, "--self", "--filter", "CA"])
     out, _ = capsys.readouterr()
-    assert "CA" in out or "RMSD" in out
+    assert "RMSD" in out
+    assert "[CA]" in out  # filter label should appear in the output
 
 
 # ------------------------------------------------------------------ #
