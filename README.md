@@ -1,6 +1,6 @@
 # molconvert
 
-A CLI-based molecular structure conversion engine that uses **internal coordinates (IC) as its core intermediate representation**. Convert freely between PDB, SDF, and Z-matrix (ZMAT) formats — all routed through a single, lossless JSON-based internal representation.
+A CLI-based molecular structure conversion engine that uses **internal coordinates (IC) as its core intermediate representation**. Convert freely between PDB, SDF, Z-matrix (ZMAT), quantum chemistry formats (Gaussian, GAMESS), MOL2, XYZ, and GRO formats — all routed through a single, lossless JSON-based internal representation. Includes chemical validation and batch conversion.
 
 ---
 
@@ -26,8 +26,8 @@ A CLI-based molecular structure conversion engine that uses **internal coordinat
 
 molconvert reads molecular structure files, converts them to **internal coordinates** (bond lengths, bond angles, dihedral angles), and can write those internal coordinates back out in any supported format.
 
-**Supported input formats:** PDB, SDF, ZMAT  
-**Supported output formats:** PDB, SDF, ZMAT, JSON (internal representation)
+**Supported input formats:** PDB, SDF, ZMAT, Gaussian .log/.out, GAMESS .out, MOL2  
+**Supported output formats:** PDB, SDF, ZMAT, JSON, MOL2, XYZ, GRO, Gaussian .gjf, GAMESS .inp
 
 Use cases:
 - Convert a protein PDB file to a Z-matrix for analysis or ML input
@@ -44,12 +44,12 @@ Every conversion goes through a single internal representation — **MoleculeIC*
 ```
 Input formats               Core IR (JSON/MoleculeIC)          Output formats
 ─────────────               ─────────────────────────          ──────────────
-PDB  ── pdb_parser  ──►     ┌─────────────────────┐  ──►      PDB
-SDF  ── sdf_parser  ──►     │    MoleculeIC        │  ──►      SDF
-ZMAT ── zmat_to_json ──►    │  (bond_length,       │  ──►      ZMAT
-                            │   bond_angle,        │  ──►      JSON
-                            │   dihedral + XYZ)    │
-                            └─────────────────────┘
+PDB  ── pdb_parser     ──►  ┌─────────────────────┐  ──►      PDB
+SDF  ── sdf_parser     ──►  │    MoleculeIC        │  ──►      SDF
+ZMAT ── zmat_to_json   ──►  │  (bond_length,       │  ──►      ZMAT, JSON
+LOG  ── gaussian_parser ─►  │   bond_angle,        │  ──►      MOL2, XYZ, GRO
+OUT  ── gamess_parser  ──►  │   dihedral + XYZ)    │  ──►      Gaussian .gjf
+MOL2 ── mol2_parser    ──►  └─────────────────────┘  ──►      GAMESS .inp
 ```
 
 **Internal coordinate scheme:**
@@ -118,14 +118,22 @@ convert INPUT [--to FORMAT] [-o OUTPUT] [options]
 
 | Argument | Description |
 |---|---|
-| `INPUT` | Input file — auto-detected by extension (`.pdb`, `.sdf`, `.zmat`) |
-| `--to FORMAT` | Output format: `json`, `pdb`, `sdf`, `zmat`, `internal` (= `json`) |
+| `INPUT` | Input file/dir — auto-detected by extension (`.pdb`, `.sdf`, `.zmat`, `.log`, `.out`, `.mol2`) |
+| `--to FORMAT` | Output format: `json`, `pdb`, `sdf`, `zmat`, `internal`, `mol2`, `xyz`, `gro`, `gjf`, `inp` |
 | `-o PATH` | Write output to a file instead of printing to screen |
 | `--chain ID` | Process one chain only, e.g. `--chain A` (PDB input only) |
 | `--include-hetatm` | Also process ligand/HETATM records (PDB input only) |
 | `--remove-hydrogens` | Strip hydrogen atoms (SDF input only) |
 | `--summary` | Print bond-length / angle / dihedral statistics to stderr |
 | `--model N` | Choose MODEL record index (PDB input only, default: 0) |
+| `--input-format` | Explicitly specify input format for `.out` files (`gaussian`, `gamess`) |
+| `--step` | Geometry step to extract (`last`, `all`, `N`) (gaussian/gamess) |
+| `--charge N` | Molecular charge (gjf/inp output) |
+| `--multiplicity N` | Spin multiplicity (gjf/inp output) |
+| `--route "..."` | Gaussian route section (gjf output) |
+| `--validate` | Run chemical validation after conversion |
+| `--report PATH` | Write validation report to file |
+| `--recursive` | Recurse subdirectories in batch mode |
 
 ---
 
@@ -271,6 +279,58 @@ IC Summary — 304 atoms (1 anchors)
 
 ---
 
+**Gaussian .log → PDB**
+
+```bash
+convert opt.log --to pdb -o out.pdb
+```
+
+---
+
+**GAMESS .out → XYZ (with format override)**
+
+```bash
+convert opt.out --input-format gamess --to xyz -o out.xyz
+```
+
+---
+
+**MOL2 → SDF**
+
+```bash
+convert lig.mol2 --to sdf -o lig.sdf
+```
+
+---
+
+**Batch conversion with directory input**
+
+```bash
+convert data/ --recursive --to pdb
+```
+
+---
+
+**Chemical validation**
+
+```bash
+convert lig.sdf --to mol2 --validate --report val.json
+```
+
+---
+
+**Other formats (mol2, xyz, gro, gjf, inp)**
+
+```bash
+convert mol.sdf --to mol2
+convert mol.pdb --to xyz
+convert mol.pdb --to gro
+convert mol.mol2 --to gjf --charge 0 --multiplicity 1 --route "#P B3LYP/6-31G(d) Opt"
+convert mol.mol2 --to inp --charge 0 --multiplicity 1
+```
+
+---
+
 ### rmsd
 
 Computes the Root Mean Square Deviation (RMSD) between two structures, or tests round-trip reconstruction accuracy.
@@ -353,6 +413,10 @@ Max deviation: 0.0000 Å
 | `.zmat` | `sdf` | ZMAT → SDF (bonds inferred) |
 | `.zmat` | `json` | ZMAT → internal coordinates JSON |
 | `.zmat` | `internal` | alias for `json` |
+| `.log` | `json/pdb/sdf/mol2/xyz/gro/gjf/inp` | Gaussian .log to formats |
+| `.out` | `json/pdb/sdf/mol2/xyz/gro/gjf/inp` | GAMESS/Gaussian .out to formats (with `--input-format`) |
+| `.mol2` | `json/pdb/sdf/xyz/gro/gjf/inp` | MOL2 to formats |
+| `.pdb/.sdf/.zmat` | `mol2/xyz/gro/gjf/inp` | Existing formats to new formats |
 
 ---
 
@@ -363,17 +427,29 @@ All functionality is accessible programmatically:
 ```python
 from molconvert.parsers.pdb_parser import parse_pdb
 from molconvert.parsers.sdf_parser import parse_sdf
+from molconvert.parsers.gaussian_parser import parse_gaussian
+from molconvert.parsers.gamess_parser import parse_gamess
+from molconvert.parsers.mol2_parser import parse_mol2
 from molconvert.builders.reconstruct import reconstruct, to_pdb, save_pdb
 from molconvert.builders.to_sdf import molecule_to_sdf, save_sdf, molecules_to_sdf
+from molconvert.builders.to_mol2 import molecule_to_mol2
+from molconvert.builders.to_xyz import molecule_to_xyz
+from molconvert.builders.to_gro import molecule_to_gro
+from molconvert.builders.to_gaussian import molecule_to_gaussian
+from molconvert.builders.to_gamess import molecule_to_gamess
 from molconvert.converters.json_to_zmat import molecule_to_zmat, save_zmat
 from molconvert.converters.zmat_to_json import zmat_to_molecule, load_zmat
 from molconvert.analysis import rmsd_molecules, per_atom_deviation, ic_summary
+from molconvert.analysis.validation import validate_molecules, format_report
 
 # --- Parse ---
 molecules = parse_pdb("input.pdb")                          # list of MoleculeIC
 mols      = parse_sdf("compounds.sdf")                      # one per record
 mols      = parse_sdf("compounds.sdf", remove_hydrogens=True)
 mol       = load_zmat("input.zmat")                         # from ZMAT file
+g_mols    = parse_gaussian("opt.log")
+gm_mols   = parse_gamess("opt.out")
+mol2_mols = parse_mol2("ligand.mol2")
 
 # --- Reconstruct Cartesian coordinates from IC ---
 mol_rebuilt = reconstruct(mol)
@@ -392,6 +468,13 @@ save_sdf_multi(mols, "output_multi.sdf")
 zmat_text = molecule_to_zmat(mol)
 save_zmat(mol, "output.zmat")
 
+# --- Export to other formats ---
+mol2_text = molecule_to_mol2(mol)
+xyz_text  = molecule_to_xyz(mol)
+gro_text  = molecule_to_gro(mol)
+gjf_text  = molecule_to_gaussian(mol, charge=0, multiplicity=1)
+inp_text  = molecule_to_gamess(mol, charge=0, multiplicity=1)
+
 # --- Export as JSON ---
 json_text = mol.to_json()
 mol.save_json("output.json")
@@ -400,6 +483,10 @@ mol.save_json("output.json")
 from molconvert.core.internal_coords import MoleculeIC
 import json
 mol = MoleculeIC.from_dict(json.load(open("output.json")))
+
+# --- Validation ---
+report = validate_molecules([mol])
+print(format_report(report))
 
 # --- RMSD comparison ---
 r = rmsd_molecules(mol, mol_rebuilt)                        # all atoms
@@ -430,22 +517,32 @@ molconvert/
 ├── molconvert/                     # main package
 │   ├── core/
 │   │   ├── internal_coords.py      # AtomIC + MoleculeIC dataclasses (the IR)
-│   │   └── geometry.py             # bond length, angle, dihedral, NeRF math
+│   │   ├── geometry.py             # bond length, angle, dihedral, NeRF math
+│   │   └── rdkit_bridge.py         # RDKit integration for advanced properties
 │   │
 │   ├── parsers/
 │   │   ├── pdb_parser.py           # PDB  → MoleculeIC
-│   │   └── sdf_parser.py           # SDF  → MoleculeIC  (uses RDKit)
+│   │   ├── sdf_parser.py           # SDF  → MoleculeIC  (uses RDKit)
+│   │   ├── gaussian_parser.py      # Gaussian .log/.out → MoleculeIC
+│   │   ├── gamess_parser.py        # GAMESS .out → MoleculeIC
+│   │   └── mol2_parser.py          # MOL2 → MoleculeIC
 │   │
 │   ├── builders/
 │   │   ├── reconstruct.py          # MoleculeIC → Cartesian → PDB string
-│   │   └── to_sdf.py               # MoleculeIC → SDF V2000 string
+│   │   ├── to_sdf.py               # MoleculeIC → SDF V2000 string
+│   │   ├── to_mol2.py              # MoleculeIC → MOL2 string
+│   │   ├── to_xyz.py               # MoleculeIC → XYZ string
+│   │   ├── to_gro.py               # MoleculeIC → GROMACS GRO string
+│   │   ├── to_gaussian.py          # MoleculeIC → Gaussian .gjf
+│   │   └── to_gamess.py            # MoleculeIC → GAMESS .inp
 │   │
 │   ├── converters/
 │   │   ├── json_to_zmat.py         # MoleculeIC → ZMAT external format
 │   │   └── zmat_to_json.py         # ZMAT → MoleculeIC
 │   │
 │   ├── analysis/
-│   │   └── rmsd.py                 # RMSD, per-atom deviation, IC statistics
+│   │   ├── rmsd.py                 # RMSD, per-atom deviation, IC statistics
+│   │   └── validation.py           # Chemical validation heuristics
 │   │
 │   └── cli/
 │       └── main.py                 # run_convert + run_rmsd entry points
@@ -461,7 +558,13 @@ molconvert/
     ├── test_analysis.py            # RMSD and IC summary tests
     ├── test_cli.py                 # CLI command tests
     ├── test_zmat.py                # ZMAT converter tests
-    └── test_sdf_convert.py         # SDF builder and SDF CLI tests
+    ├── test_sdf_convert.py         # SDF builder and SDF CLI tests
+    ├── test_gaussian_parser.py     # Gaussian parser tests
+    ├── test_gamess_parser.py       # GAMESS parser tests
+    ├── test_mol2_parser.py         # MOL2 parser tests
+    ├── test_xyz_gro_builders.py    # XYZ/GRO builders tests
+    ├── test_quantum_builders.py    # Gaussian/GAMESS builders tests
+    └── test_mol2_validation.py     # MOL2 builder and validation tests
 ```
 
 ---
@@ -473,7 +576,7 @@ cd molconvert
 pytest tests/ -v
 ```
 
-214 tests covering:
+376 tests covering:
 
 - Geometry math (bond length, angle, dihedral, NeRF)
 - PDB parser
@@ -483,6 +586,14 @@ pytest tests/ -v
 - CLI commands (all input/output combinations)
 - ZMAT converter (JSON ↔ ZMAT, round-trip accuracy)
 - SDF builder (bond inference, multi-record output)
+- Gaussian parser (42 tests)
+- GAMESS parser
+- MOL2 parser
+- XYZ/GRO builders (15 tests)
+- Gaussian/GAMESS input builders (21 tests)
+- MOL2 builder + validation (22 tests)
+- CLI updates (28 tests)
+- Batch mode + --recursive
 
 ---
 
@@ -514,3 +625,6 @@ Adding a new input or output format means writing one parser or builder module. 
 | **No PDB CONECT records** | PDB output does not write CONECT (bond) records. Bond connectivity is only preserved in SDF output (via distance inference). |
 | **Single conformer** | Each `MoleculeIC` stores one conformer. Multi-conformer SDF files are parsed as separate molecules; PDB MODEL records are handled per-model. |
 | **Python 3.9+ required** | The codebase uses modern Python type hints. Python 3.8 and earlier are not supported. |
+| **No V3000 support** | No V3000 support for molecules with >999 atoms |
+| **GAMESS builder limits** | GAMESS builder only supports elements H-Xe (Z=1-54) |
+| **Validation thresholds** | Validation collision threshold (0.4 A) may be aggressive for crystal structures |
