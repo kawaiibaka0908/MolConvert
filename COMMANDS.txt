@@ -862,3 +862,125 @@ Call chain:
        reconstruct(mol)   (positions already set from SDF parser — no-op)
        to_pdb(mol_r, model_id=i+1)
   6. Print MODEL/ATOM/ENDMDL blocks to stdout.
+
+
+──────────────────────────────────────────────────
+15. NEW PARSERS (Gaussian, GAMESS, MOL2)                      *** NEW ***
+──────────────────────────────────────────────────
+
+  parse_gaussian(path, step="last"):
+    - Parses Gaussian .log / .out files.
+    - Scans for "Standard orientation:" (or "Input orientation:") tables.
+    - step parameter filters which step to return:
+        "last" → final geometry (default)
+        "all"  → list of MoleculeIC for all steps
+        "N"    → step at index N (0-based)
+    - Element symbols looked up via RDKit GetPeriodicTable().
+
+  parse_gamess(path, step="last"):
+    - Parses GAMESS .out files.
+    - Scans for "COORDINATES OF ALL ATOMS" blocks.
+    - Automatically detects (BOHR) or (ANGS) units.
+    - Bohr coordinates converted via factor 0.529177210903.
+    - Atomic numbers mapped to element symbols via RDKit.
+
+  parse_mol2(path):
+    - Parses Tripos MOL2 files.
+    - Splits into @<TRIPOS>MOLECULE blocks.
+    - Extracts ATOM and BOND sections.
+    - Atom types (e.g. C.3, N.am) mapped back to element symbols (C, N).
+
+
+──────────────────────────────────────────────────
+16. NEW BUILDERS (MOL2, XYZ, GRO, Gaussian, GAMESS)            *** NEW ***
+──────────────────────────────────────────────────
+
+  molecule_to_mol2(mol):
+    - Converts MoleculeIC to Tripos MOL2 text.
+    - Uses RDKit determineBonds to perceive bond orders.
+    - Maps atoms to Tripos SYBYL types (C.3, C.2, C.1, C.ar, N.am, O.co2).
+
+  molecule_to_xyz(mol):
+    - Standard XYZ format output (atom count, title, element X Y Z).
+    - Coordinates in Angstroms.
+
+  molecule_to_gro(mol, box):
+    - GROMACS GRO format (fixed-width columns).
+    - Coordinates converted from Angstroms to nanometers (divided by 10.0).
+
+  molecule_to_gaussian(mol, route, charge, multiplicity, title):
+    - Formats MoleculeIC as Gaussian input file (.gjf / .com).
+    - Writes route section (default "# HF/6-31G(d) opt"), title, and charge/multiplicity.
+
+  molecule_to_gamess(mol, contrl, basis, charge, multiplicity, title):
+    - Formats MoleculeIC as GAMESS input file (.inp).
+    - Writes $CONTRL group ($ in column 2), $BASIS group, and $DATA section.
+
+
+──────────────────────────────────────────────────
+17. CHEMICAL VALIDATION ENGINE                                *** NEW ***
+──────────────────────────────────────────────────
+
+File: molconvert/analysis/validation.py
+
+  validate_molecule(mol) → ValidationReport:
+    1. Atom collision detection:
+         dist < 0.4 Å → error ("Atom collision")
+         dist < 0.8 Å → warning ("Atoms unusually close")
+    2. Bond perception & valence check:
+         Perceives bonds via RDKit determineBonds.
+         Checks rdatom.HasValenceViolation().
+         Flags valence violations with context-specific suggestions (e.g. +1 formal charge for quaternary N).
+    3. Full RDKit sanitization:
+         Chem.SanitizeMol(rdmol) check.
+
+  format_report(reports, verbose=True) → str:
+    Formats validation results as human-readable [PASS] / [FAIL] summary.
+
+
+──────────────────────────────────────────────────
+18. BATCH CONVERSION & RECURSIVE SCANNING                     *** NEW ***
+──────────────────────────────────────────────────
+
+  convert INPUT_DIR/ --to FORMAT [-o OUTPUT_DIR/] [--recursive]
+
+  - Automatically discovers all supported files (.pdb, .sdf, .zmat, .log, .out, .mol2).
+  - --recursive scans subdirectories.
+  - Converts each file independently and writes output with updated extension.
+  - Resilient execution: SystemExit on single-file error logs [FAIL] and continues batch.
+
+
+──────────────────────────────────────────────────
+19. COMPLETE EXAMPLE: convert calc.log --to mol2 --validate
+──────────────────────────────────────────────────
+
+  1. Shell → run_convert(["calc.log", "--to", "mol2", "--validate"])
+  2. in_ext=".log" → in_fmt="gaussian"
+  3. parse_gaussian("calc.log", step="last") → [MoleculeIC]
+  4. reconstruct(mol) → Cartesian coordinates
+  5. molecule_to_mol2(mol_r)
+       → molecule_to_rdmol(mol) via RDKit determineBonds
+       → tripos_atom_type() for SYBYL types
+       → outputs @<TRIPOS>MOLECULE, ATOM, and BOND sections
+  6. validate_molecules([mol_r])
+       → collision check (< 0.4 Å)
+       → valence check
+       → RDKit sanitization
+  7. Prints MOL2 string to stdout + validation report to stderr.
+
+
+──────────────────────────────────────────────────
+20. COMPLETE EXAMPLE: Batch directory conversion
+──────────────────────────────────────────────────
+
+  1. Shell → run_convert(["data_dir/", "--to", "xyz", "-o", "out_dir/", "--recursive"])
+  2. input_path.is_dir() → triggers _run_batch()
+  3. rglob("*") finds all .pdb, .sdf, .zmat, .log, .out, .mol2 files recursively.
+  4. For each file:
+       - detects format from extension
+       - parses to MoleculeIC
+       - builds XYZ string via molecule_to_xyz()
+       - writes to out_dir / (filename.stem + ".xyz")
+       - logs [OK] to stderr
+  5. Prints summary: "Batch complete: N converted, M failed".
+
